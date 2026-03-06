@@ -37,6 +37,17 @@ ghosttyctl current                                        # current tab info (JS
 
 Environment variables `GHOSTTY_SOCKET` and `GHOSTTY_TAB_ID` are injected into every terminal session.
 
+### Claude Code Integration
+
+Add these instructions to your `~/.claude/CLAUDE.md` so Claude Code can use the sidebar:
+
+```markdown
+- Rename the workspace using: `ghosttyctl rename "Claude: <name>"`. Name it after the specific work being done.
+- You can set custom sidebar status entries using `ghosttyctl set-status <key> <value> [--icon <sf-symbol>]` and clear with `ghosttyctl clear-status <key>`.
+```
+
+Claude Code will then automatically rename tabs and set status context as it works.
+
 ---
 
 <!-- LOGO -->
