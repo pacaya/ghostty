@@ -3,7 +3,7 @@
 🧪 Please note that this is experimental and I built it for my own use. It works fine for me, but feel free and try to break it.
 
 🐛 Known bugs
-- Unread indicator does not clear correctly, and might re-appear when switching tabs
+~~- Unread indicator does not clear correctly, and might re-appear when switching tabs~~
 
 <img width="1125" height="749" alt="ghostty-sidebar" src="https://github.com/user-attachments/assets/919a9220-4e07-4b2e-b491-c9d385b6585f" />
 
