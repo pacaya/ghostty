@@ -45,6 +45,7 @@ brentschroeter
 cespare
 charliie-dev
 chernetskyi
+chronologos
 cmwetherell
 craziestowl
 curtismoncoq
@@ -52,12 +53,15 @@ d-dudas
 daiimus
 damyanbogoev
 danulqua
+dariogriffo
 dervedro
 diaaeddin
+dmehala
 doprz
 douglance
 douglas
 drepper
+dzhlobo
 elias8
 ephemera
 eriksremess
@@ -73,11 +77,13 @@ guilhermetk
 hakonhagland
 halosatrio
 hqnna
+hulet
 icodesign
 jacobsandlund
 jake-stewart
 jcollie
 jguthmiller
+jmcgover
 johnslavik
 josephmart
 jparise
@@ -110,6 +116,7 @@ misairuzame
 mischief
 mitchellh
 miupa
+molechowski
 mrmage
 mtak
 natesmyth
@@ -118,9 +125,11 @@ nicosuave
 nmggithub
 noib3
 nwehg
+ocean6954
 oshdubh
 pan93412
 pangoraw
+pauley-unsaturated
 peilingjiang
 peterdavehello
 phush0
@@ -138,6 +147,7 @@ rmunn
 rockorager
 rpfaeffle
 secrus
+seruman
 silveirapf
 slsrepo
 sunshine-syz
@@ -149,6 +159,7 @@ tristan957
 tweedbeetle
 uhojin
 uzaaft
+vaughanandrews
 vlsi
 yamshta
 zenyr

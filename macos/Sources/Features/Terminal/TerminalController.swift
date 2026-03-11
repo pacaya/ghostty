@@ -19,10 +19,10 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         }
 
         let nib = switch config.macosTitlebarStyle {
-        case "native": "Terminal"
-        case "hidden": "TerminalHiddenTitlebar"
-        case "transparent": "TerminalTransparentTitlebar"
-        case "tabs":
+        case .native: "Terminal"
+        case .hidden: "TerminalHiddenTitlebar"
+        case .transparent: "TerminalTransparentTitlebar"
+        case .tabs:
 #if compiler(>=6.2)
             if #available(macOS 26.0, *) {
                 "TerminalTabsTitlebarTahoe"
@@ -32,7 +32,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 #else
             "TerminalTabsTitlebarVentura"
 #endif
-        default: defaultValue
         }
 
         return nib
@@ -1088,6 +1087,12 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             TerminalView(ghostty: ghostty, viewModel: self, delegate: self)
         }
 
+        // Set the initial content size on the container so that
+        // intrinsicContentSize returns the correct value immediately,
+        // without waiting for @FocusedValue to propagate through the
+        // SwiftUI focus chain.
+        terminalContainer.initialContentSize = focusedSurface?.initialSize
+
         // Create the sidebar hosting view
         let sidebarHostingView = NSHostingView(rootView: SidebarView(
             tabManager: tabManager,
@@ -1116,21 +1121,12 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
         // If we have a default size, we want to apply it.
         if let defaultSize {
-            switch defaultSize {
-            case .frame:
-                // Frames can be applied immediately
-                defaultSize.apply(to: window)
+            defaultSize.apply(to: window)
 
-            case .contentIntrinsicSize:
-                // Content intrinsic size requires a short delay so that AppKit
-                // can layout our SwiftUI views.
-                DispatchQueue.main.asyncAfter(deadline: .now() + .microseconds(10_000)) { [weak self, weak window] in
-                    guard let self, let window else { return }
-                    defaultSize.apply(to: window)
-                    if let screen = window.screen ?? NSScreen.main {
-                        let frame = self.adjustForWindowPosition(frame: window.frame, on: screen)
-                        window.setFrameOrigin(frame.origin)
-                    }
+            if case .contentIntrinsicSize = defaultSize {
+                if let screen = window.screen ?? NSScreen.main {
+                    let frame = self.adjustForWindowPosition(frame: window.frame, on: screen)
+                    window.setFrameOrigin(frame.origin)
                 }
             }
         }
@@ -1648,7 +1644,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     struct DerivedConfig {
         let backgroundColor: Color
         let macosWindowButtons: Ghostty.MacOSWindowButtons
-        let macosTitlebarStyle: String
+        let macosTitlebarStyle: Ghostty.Config.MacOSTitlebarStyle
         let maximize: Bool
         let windowPositionX: Int16?
         let windowPositionY: Int16?
@@ -1656,7 +1652,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         init() {
             self.backgroundColor = Color(NSColor.windowBackgroundColor)
             self.macosWindowButtons = .visible
-            self.macosTitlebarStyle = "system"
+            self.macosTitlebarStyle = .default
             self.maximize = false
             self.windowPositionX = nil
             self.windowPositionY = nil
