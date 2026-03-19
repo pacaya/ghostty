@@ -134,6 +134,9 @@ class SidebarTabManager: ObservableObject {
     // MARK: - Attention
 
     private func markAttention(window w: NSWindow) {
+        // Don't mark attention for the currently selected tab — the user can already see it.
+        let selected = window?.tabGroup?.selectedWindow ?? window
+        guard w !== selected else { return }
         attentionWindows.insert(ObjectIdentifier(w))
         refresh()
     }
