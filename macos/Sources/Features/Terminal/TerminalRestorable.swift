@@ -48,6 +48,9 @@ class TerminalRestorableState: TerminalRestorable {
     let effectiveFullscreenMode: FullscreenMode?
     let tabColor: TerminalTabColor
     let titleOverride: String?
+    /// The associated project ID, if this tab is linked to a saved project.
+    /// Optional field added without version bump — old state decodes with nil.
+    let projectId: UUID?
 
     init(from controller: TerminalController) {
         self.focusedSurface = controller.focusedSurface?.id.uuidString
@@ -55,6 +58,11 @@ class TerminalRestorableState: TerminalRestorable {
         self.effectiveFullscreenMode = controller.fullscreenStyle?.fullscreenMode
         self.tabColor = (controller.window as? TerminalWindow)?.tabColor ?? .none
         self.titleOverride = controller.titleOverride
+        if let window = controller.window {
+            self.projectId = MainActor.assumeIsolated { ProjectStore.shared.projectId(for: window) }
+        } else {
+            self.projectId = nil
+        }
     }
 
     required init(copy other: TerminalRestorableState) {
@@ -63,6 +71,7 @@ class TerminalRestorableState: TerminalRestorable {
         self.effectiveFullscreenMode = other.effectiveFullscreenMode
         self.tabColor = other.tabColor
         self.titleOverride = other.titleOverride
+        self.projectId = other.projectId
     }
 }
 
@@ -126,6 +135,13 @@ class TerminalWindowRestoration: NSObject, NSWindowRestoration {
 
         // Restore the tab title override
         c.titleOverride = state.titleOverride
+
+        // Restore project association
+        if let projectId = state.projectId {
+            MainActor.assumeIsolated {
+                ProjectStore.shared.associate(window: window, with: projectId)
+            }
+        }
 
         // Setup our restored state on the controller
         // Find the focused surface in surfaceTree

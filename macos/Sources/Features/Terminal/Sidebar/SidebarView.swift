@@ -61,6 +61,7 @@ enum SidebarField: String, Hashable {
 /// A vertical sidebar that displays the list of tabs for the current window group.
 struct SidebarView: View {
     @ObservedObject var tabManager: SidebarTabManager
+    @ObservedObject var projectStore: ProjectStore
     var theme: SidebarTheme
     var fields: Set<SidebarField> = SidebarField.defaultFields
 
@@ -73,7 +74,7 @@ struct SidebarView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
-                    SidebarTabCard(tab: tab, theme: theme, fields: fields, showCardBorder: showCardBorder, dimInactive: dimInactiveColors)
+                    SidebarTabCard(tab: tab, theme: theme, fields: fields, projectStore: projectStore, showCardBorder: showCardBorder, dimInactive: dimInactiveColors)
                         .contentShape(Rectangle())
                         .opacity(draggingTabID == tab.id ? 0.4 : 1.0)
                         .overlay(alignment: .top) {
@@ -124,7 +125,32 @@ struct SidebarView: View {
 
                             Divider()
 
-                            Button("Close Tab") {
+                            let associatedProjectId = projectStore.projectId(for: tab.window)
+
+                            if let projectId = associatedProjectId {
+                                Button("Close Tab") {
+                                    if let controller = tab.window.windowController as? BaseTerminalController {
+                                        _ = projectStore.snapshotFromTab(
+                                            controller: controller,
+                                            existingProjectId: projectId
+                                        )
+                                    }
+                                    projectStore.disassociate(window: tab.window)
+                                    tabManager.closeTab(tab)
+                                }
+                            } else {
+                                Button("Save to Projects") {
+                                    if let controller = tab.window.windowController as? BaseTerminalController,
+                                       let project = projectStore.snapshotFromTab(controller: controller) {
+                                        projectStore.associate(window: tab.window, with: project.id)
+                                    }
+                                }
+                            }
+
+                            Button("Delete Tab") {
+                                if associatedProjectId != nil {
+                                    projectStore.disassociate(window: tab.window)
+                                }
                                 tabManager.closeTab(tab)
                             }
 
@@ -196,6 +222,7 @@ private struct SidebarTabCard: View {
     let tab: SidebarTabManager.TabItem
     let theme: SidebarTheme
     let fields: Set<SidebarField>
+    @ObservedObject var projectStore: ProjectStore
     var showCardBorder: Bool = true
     var dimInactive: Bool = false
 
@@ -241,6 +268,12 @@ private struct SidebarTabCard: View {
                             .foregroundColor(tab.isSelected ? theme.foreground : theme.secondaryText)
 
                         Spacer()
+
+                        if projectStore.projectId(for: tab.window) != nil {
+                            Image(systemName: "bookmark.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(theme.secondaryText)
+                        }
 
                         if tab.needsAttention {
                             Circle()

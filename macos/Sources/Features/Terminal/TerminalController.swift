@@ -63,7 +63,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     private(set) var sidebarTabManager: SidebarTabManager?
 
     /// The sidebar hosting view, kept for theme updates on config change.
-    private var sidebarHostingView: NSHostingView<SidebarView>?
+    private var sidebarHostingView: NSHostingView<SidebarContainerView>?
 
 
     init(_ ghostty: Ghostty.App,
@@ -565,8 +565,9 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     private func updateSidebarTheme(_ config: Ghostty.Config) {
         guard let sidebarHostingView, let sidebarTabManager else { return }
         let newTheme = config.sidebarTheme
-        sidebarHostingView.rootView = SidebarView(
+        sidebarHostingView.rootView = SidebarContainerView(
             tabManager: sidebarTabManager,
+            projectStore: ProjectStore.shared,
             theme: newTheme,
             fields: config.sidebarFields
         )
@@ -1095,8 +1096,9 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         terminalContainer.initialContentSize = focusedSurface?.initialSize
 
         // Create the sidebar hosting view
-        let sidebarHostingView = NSHostingView(rootView: SidebarView(
+        let sidebarHostingView = NSHostingView(rootView: SidebarContainerView(
             tabManager: tabManager,
+            projectStore: ProjectStore.shared,
             theme: ghostty.config.sidebarTheme,
             fields: ghostty.config.sidebarFields
         ))

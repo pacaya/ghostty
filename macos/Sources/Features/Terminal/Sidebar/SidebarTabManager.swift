@@ -218,6 +218,9 @@ class SidebarTabManager: ObservableObject {
 
     func setTabColor(_ color: TerminalTabColor, for tab: TabItem) {
         (tab.window as? TerminalWindow)?.tabColor = color
+        if let projectId = ProjectStore.shared.projectId(for: tab.window) {
+            ProjectStore.shared.updateProjectColor(projectId, to: color)
+        }
         refresh()
     }
 
@@ -229,6 +232,9 @@ class SidebarTabManager: ObservableObject {
     func renameTab(_ tab: TabItem, to newTitle: String) {
         guard let controller = tab.window.windowController as? BaseTerminalController else { return }
         controller.titleOverride = newTitle.isEmpty ? nil : newTitle
+        if let projectId = ProjectStore.shared.projectId(for: tab.window) {
+            ProjectStore.shared.renameProject(projectId, to: newTitle.isEmpty ? (tab.window.title) : newTitle)
+        }
         refresh()
     }
 
