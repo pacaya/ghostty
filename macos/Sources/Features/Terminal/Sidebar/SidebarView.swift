@@ -275,6 +275,12 @@ private struct SidebarTabCard: View {
                                 .foregroundColor(theme.secondaryText)
                         }
 
+                        if tab.hasRunningProcess {
+                            Image(systemName: "terminal")
+                                .font(.system(size: 9))
+                                .foregroundColor(theme.attentionColor)
+                        }
+
                         if tab.needsAttention {
                             Circle()
                                 .fill(theme.attentionColor)

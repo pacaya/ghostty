@@ -14,7 +14,7 @@ struct ProjectFolderRow: View {
     @State private var renameText: String = ""
     @FocusState private var isRenameFocused: Bool
     @State private var draggingProjectID: UUID?
-    @State private var dropTargetProjectID: UUID?
+    @State private var projectDropTarget: ProjectDropTarget?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -120,16 +120,17 @@ struct ProjectFolderRow: View {
                         theme: theme,
                         depth: depth + 1
                     )
-                    .dragDropIndicator(itemID: project.id, draggingID: draggingProjectID, dropTargetID: dropTargetProjectID)
+                    .projectDragDropIndicator(itemID: project.id, draggingID: draggingProjectID, dropTarget: projectDropTarget)
                     .onDrag {
                         draggingProjectID = project.id
                         return NSItemProvider(object: "project:\(project.id.uuidString)" as NSString)
                     }
                     .onDrop(of: [UTType.text], delegate: ProjectDropDelegate(
                         projectStore: projectStore,
+                        tabManager: tabManager,
                         currentProject: project,
                         draggingProjectID: $draggingProjectID,
-                        dropTargetProjectID: $dropTargetProjectID
+                        projectDropTarget: $projectDropTarget
                     ))
                 }
             }

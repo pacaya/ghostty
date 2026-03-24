@@ -13,6 +13,7 @@ class SidebarTabManager: ObservableObject {
         let statusEntries: [TabMetadataStore.StatusEntry]
         let isSelected: Bool
         let needsAttention: Bool
+        let hasRunningProcess: Bool
         let tabColor: TerminalTabColor
         let window: NSWindow
 
@@ -33,6 +34,7 @@ class SidebarTabManager: ObservableObject {
                 && lhs.surfaceId == rhs.surfaceId
                 && lhs.statusEntries == rhs.statusEntries
                 && lhs.needsAttention == rhs.needsAttention
+                && lhs.hasRunningProcess == rhs.hasRunningProcess
                 && lhs.tabColor == rhs.tabColor
         }
     }
@@ -189,6 +191,7 @@ class SidebarTabManager: ObservableObject {
             let entries = sid.map { metadataStore.statusEntries(for: $0) } ?? []
             let branch = pwd.flatMap { gitBranch(at: $0) }
             let color = (w as? TerminalWindow)?.tabColor ?? .none
+            let hasRunningProcess = controller?.surfaceTree.contains(where: { $0.needsConfirmQuit }) ?? false
 
             return TabItem(
                 id: wid,
@@ -199,6 +202,7 @@ class SidebarTabManager: ObservableObject {
                 statusEntries: entries,
                 isSelected: w === selectedWindow,
                 needsAttention: attentionWindows.contains(wid) && w !== selectedWindow,
+                hasRunningProcess: hasRunningProcess,
                 tabColor: color,
                 window: w
             )

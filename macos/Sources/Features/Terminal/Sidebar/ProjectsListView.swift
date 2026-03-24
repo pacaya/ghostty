@@ -1,6 +1,18 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Drop Position Types
+
+enum DropEdge: Equatable {
+    case top
+    case bottom
+}
+
+struct ProjectDropTarget: Equatable {
+    let projectID: UUID
+    let edge: DropEdge
+}
+
 /// Scrollable tree view of project folders and project items.
 struct ProjectsListView: View {
     @ObservedObject var projectStore: ProjectStore
@@ -8,7 +20,7 @@ struct ProjectsListView: View {
     var theme: SidebarTheme
 
     @State private var draggingProjectID: UUID?
-    @State private var dropTargetProjectID: UUID?
+    @State private var projectDropTarget: ProjectDropTarget?
     @State private var draggingFolderID: UUID?
     @State private var dropTargetFolderID: UUID?
 
@@ -50,8 +62,7 @@ struct ProjectsListView: View {
                             currentFolder: folder,
                             draggingFolderID: $draggingFolderID,
                             dropTargetFolderID: $dropTargetFolderID,
-                            draggingProjectID: $draggingProjectID,
-                            dropTargetProjectID: $dropTargetProjectID
+                            draggingProjectID: $draggingProjectID
                         ))
                     }
 
@@ -64,16 +75,17 @@ struct ProjectsListView: View {
                             theme: theme,
                             depth: 0
                         )
-                        .dragDropIndicator(itemID: project.id, draggingID: draggingProjectID, dropTargetID: dropTargetProjectID)
+                        .projectDragDropIndicator(itemID: project.id, draggingID: draggingProjectID, dropTarget: projectDropTarget)
                         .onDrag {
                             draggingProjectID = project.id
                             return NSItemProvider(object: "project:\(project.id.uuidString)" as NSString)
                         }
                         .onDrop(of: [UTType.text], delegate: ProjectDropDelegate(
                             projectStore: projectStore,
+                            tabManager: tabManager,
                             currentProject: project,
                             draggingProjectID: $draggingProjectID,
-                            dropTargetProjectID: $dropTargetProjectID
+                            projectDropTarget: $projectDropTarget
                         ))
                     }
                 }
@@ -87,45 +99,97 @@ struct ProjectsListView: View {
 // MARK: - ProjectDropDelegate
 
 struct ProjectDropDelegate: DropDelegate {
+    static let defaultCardHeight: CGFloat = 40
+
     let projectStore: ProjectStore
+    let tabManager: SidebarTabManager
     let currentProject: Project
+    var cardHeight: CGFloat = Self.defaultCardHeight
     @Binding var draggingProjectID: UUID?
-    @Binding var dropTargetProjectID: UUID?
+    @Binding var projectDropTarget: ProjectDropTarget?
+
+    private func edge(for info: DropInfo) -> DropEdge {
+        info.location.y < cardHeight / 2 ? .top : .bottom
+    }
 
     func dropEntered(info: DropInfo) {
-        dropTargetProjectID = currentProject.id
+        projectDropTarget = ProjectDropTarget(projectID: currentProject.id, edge: edge(for: info))
     }
 
     func dropExited(info: DropInfo) {
-        if dropTargetProjectID == currentProject.id {
-            dropTargetProjectID = nil
+        if projectDropTarget?.projectID == currentProject.id {
+            projectDropTarget = nil
         }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
+        let newTarget = ProjectDropTarget(projectID: currentProject.id, edge: edge(for: info))
+        if projectDropTarget != newTarget {
+            projectDropTarget = newTarget
+        }
+        return DropProposal(operation: .move)
     }
 
     func validateDrop(info: DropInfo) -> Bool {
-        draggingProjectID != nil && draggingProjectID != currentProject.id
+        // Accept project reorder
+        if let projectId = draggingProjectID {
+            return projectId != currentProject.id
+        }
+        // Accept tab drops
+        return info.hasItemsConforming(to: [UTType.text])
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let sourceId = draggingProjectID else { return false }
+        let insertEdge = edge(for: info)
 
-        projectStore.reorderProject(
-            fromId: sourceId,
-            toId: currentProject.id,
-            inFolder: currentProject.folderId
-        )
+        // Case 1: Project-to-project reorder
+        if let sourceId = draggingProjectID {
+            projectStore.reorderProject(
+                fromId: sourceId,
+                toId: currentProject.id,
+                inFolder: currentProject.folderId
+            )
+            draggingProjectID = nil
+            projectDropTarget = nil
+            return true
+        }
 
-        draggingProjectID = nil
-        dropTargetProjectID = nil
+        // Case 2: Tab or project drop from payload
+        guard let item = info.itemProviders(for: [UTType.text]).first else { return false }
+
+        item.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { data, _ in
+            guard let data = data as? Data,
+                  let payload = String(data: data, encoding: .utf8) else { return }
+
+            Task { @MainActor in
+                if payload.hasPrefix("project:"),
+                   let projectId = UUID(uuidString: String(payload.dropFirst("project:".count))) {
+                    // Move existing project to this position
+                    projectStore.moveProject(projectId, toFolder: currentProject.folderId)
+                    projectStore.insertProject(projectId, relativeTo: currentProject.id, edge: insertEdge, inFolder: currentProject.folderId)
+                } else if let index = Int(payload) {
+                    // Tab drop: snapshot and insert at position
+                    guard index >= 0, index < tabManager.tabs.count else { return }
+                    let tab = tabManager.tabs[index]
+                    guard let controller = tab.window.windowController as? BaseTerminalController else { return }
+
+                    if let project = projectStore.snapshotFromTab(controller: controller) {
+                        var updated = project
+                        updated.folderId = currentProject.folderId
+                        projectStore.updateProject(updated)
+                        projectStore.insertProject(project.id, relativeTo: currentProject.id, edge: insertEdge, inFolder: currentProject.folderId)
+                        projectStore.associate(window: tab.window, with: project.id)
+                    }
+                }
+            }
+        }
+
+        projectDropTarget = nil
         return true
     }
 }
 
-// MARK: - Drag-Drop Indicator
+// MARK: - Drag-Drop Indicators
 
 extension View {
     /// Applies the standard drag-drop visual treatment: dims the dragged item
@@ -146,6 +210,25 @@ extension View {
                 }
             }
     }
+
+    /// Position-aware drag-drop indicator that shows the insertion line at the
+    /// top or bottom edge depending on cursor position.
+    func projectDragDropIndicator(
+        itemID: UUID,
+        draggingID: UUID?,
+        dropTarget: ProjectDropTarget?
+    ) -> some View {
+        self
+            .opacity(draggingID == itemID ? 0.4 : 1.0)
+            .overlay(alignment: dropTarget?.edge == .bottom ? .bottom : .top) {
+                if dropTarget?.projectID == itemID && draggingID != itemID {
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(height: 2)
+                        .offset(y: dropTarget?.edge == .bottom ? 1 : -1)
+                }
+            }
+    }
 }
 
 // MARK: - FolderDropDelegate
@@ -156,7 +239,6 @@ private struct FolderDropDelegate: DropDelegate {
     @Binding var draggingFolderID: UUID?
     @Binding var dropTargetFolderID: UUID?
     @Binding var draggingProjectID: UUID?
-    @Binding var dropTargetProjectID: UUID?
 
     func dropEntered(info: DropInfo) {
         dropTargetFolderID = currentFolder.id
@@ -199,7 +281,6 @@ private struct FolderDropDelegate: DropDelegate {
                 atSortOrder: projectStore.nextSortOrder(in: currentFolder.id)
             )
             draggingProjectID = nil
-            dropTargetProjectID = nil
             return true
         }
 

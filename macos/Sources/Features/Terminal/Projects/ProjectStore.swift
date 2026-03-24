@@ -205,6 +205,27 @@ final class ProjectStore: ObservableObject {
         isDirty = true
     }
 
+    /// Repositions a project relative to a target project, inserting before (.top) or after (.bottom).
+    func insertProject(_ projectId: UUID, relativeTo targetId: UUID, edge: DropEdge, inFolder folderId: UUID?) {
+        let siblings = folderId == nil ? rootProjects() : projects(in: folderId!)
+        guard let targetIdx = siblings.firstIndex(where: { $0.id == targetId }) else { return }
+
+        let insertIdx = edge == .top ? targetIdx : targetIdx + 1
+
+        // Build ordered list, remove the project if already present, insert at correct position
+        var orderedIds = siblings.map(\.id)
+        orderedIds.removeAll { $0 == projectId }
+        orderedIds.insert(projectId, at: min(insertIdx, orderedIds.count))
+
+        // Reassign sort orders
+        for (i, id) in orderedIds.enumerated() {
+            if let idx = projects.firstIndex(where: { $0.id == id }) {
+                projects[idx].sortOrder = i
+            }
+        }
+        isDirty = true
+    }
+
     /// Shared reorder algorithm: moves `sourceId` to the position of `targetId` and
     /// reassigns sort orders via the `apply` closure.
     private func reorderItems<T: Identifiable>(

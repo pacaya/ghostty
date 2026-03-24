@@ -30,6 +30,12 @@ struct SidebarProjectCard: View {
 
     var body: some View {
         let isOpen = projectStore.isOpen(project.id)
+        let isSelected: Bool = {
+            guard let selectedTab = tabManager.tabs.first(where: { $0.isSelected }),
+                  projectStore.projectId(for: selectedTab.window) == project.id else { return false }
+            return true
+        }()
+        let cardTextColor = isOpen ? theme.secondaryText : theme.secondaryText.opacity(0.7)
 
         HStack(spacing: 0) {
             // Left color accent strip
@@ -61,7 +67,7 @@ struct SidebarProjectCard: View {
                             .font(.system(size: 12, weight: .regular))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                            .foregroundColor(theme.secondaryText)
+                            .foregroundColor(cardTextColor)
                     }
 
                     Spacer()
@@ -78,10 +84,10 @@ struct SidebarProjectCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "rectangle.split.2x1")
                             .font(.system(size: 9))
-                            .foregroundColor(theme.secondaryText)
+                            .foregroundColor(cardTextColor)
                         Text("\(paneCount) panes")
                             .font(.system(size: 10))
-                            .foregroundColor(theme.secondaryText)
+                            .foregroundColor(cardTextColor)
                             .lineLimit(1)
                     }
                 }
@@ -92,6 +98,10 @@ struct SidebarProjectCard: View {
         }
         .padding(.leading, CGFloat(depth) * 12)
         .clipShape(RoundedRectangle(cornerRadius: Self.cardRadius))
+        .background(
+            RoundedRectangle(cornerRadius: Self.cardRadius)
+                .fill(isSelected ? theme.activeTabBackground : Color.clear)
+        )
         .overlay {
             if showCardBorder {
                 RoundedRectangle(cornerRadius: Self.cardRadius)
