@@ -9,7 +9,6 @@ struct ProjectFolderRow: View {
     var theme: SidebarTheme
     let depth: Int
 
-    @State private var isExpanded: Bool = true
     @State private var isRenaming: Bool = false
     @State private var renameText: String = ""
     @FocusState private var isRenameFocused: Bool
@@ -23,10 +22,10 @@ struct ProjectFolderRow: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundColor(theme.secondaryText)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .animation(.easeInOut(duration: 0.15), value: isExpanded)
+                    .rotationEffect(.degrees(folder.isExpanded ? 90 : 0))
+                    .animation(.easeInOut(duration: 0.15), value: folder.isExpanded)
 
-                Image(systemName: isExpanded ? "folder.fill" : "folder")
+                Image(systemName: folder.isExpanded ? "folder.fill" : "folder")
                     .font(.system(size: 10))
                     .foregroundColor(theme.secondaryText)
 
@@ -57,7 +56,7 @@ struct ProjectFolderRow: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 withAnimation(.easeInOut(duration: 0.15)) {
-                    isExpanded.toggle()
+                    projectStore.toggleFolderExpansion(folder.id)
                 }
             }
             .contextMenu {
@@ -74,9 +73,9 @@ struct ProjectFolderRow: View {
                         sortOrder: projectStore.nextSortOrder(in: folder.id)
                     )
                     projectStore.addFolder(subfolder)
-                    if !isExpanded {
+                    if !folder.isExpanded {
                         withAnimation(.easeInOut(duration: 0.15)) {
-                            isExpanded = true
+                            projectStore.setFolderExpanded(folder.id, true)
                         }
                     }
                 }
@@ -99,7 +98,7 @@ struct ProjectFolderRow: View {
             }
 
             // Children (when expanded)
-            if isExpanded {
+            if folder.isExpanded {
                 // Child folders
                 ForEach(projectStore.childFolders(of: folder.id)) { childFolder in
                     ProjectFolderRow(

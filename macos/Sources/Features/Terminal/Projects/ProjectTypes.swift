@@ -43,6 +43,29 @@ struct ProjectFolder: Codable, Identifiable, Equatable {
     var parentId: UUID?
     /// Display order among siblings for drag-drop reordering.
     var sortOrder: Int
+    /// Whether this folder is expanded in the sidebar. Persisted across sessions.
+    var isExpanded: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, parentId, sortOrder, isExpanded
+    }
+
+    init(id: UUID, name: String, parentId: UUID? = nil, sortOrder: Int, isExpanded: Bool = true) {
+        self.id = id
+        self.name = name
+        self.parentId = parentId
+        self.sortOrder = sortOrder
+        self.isExpanded = isExpanded
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        parentId = try container.decodeIfPresent(UUID.self, forKey: .parentId)
+        sortOrder = try container.decode(Int.self, forKey: .sortOrder)
+        isExpanded = try container.decodeIfPresent(Bool.self, forKey: .isExpanded) ?? true
+    }
 }
 
 extension ProjectLayoutNode {

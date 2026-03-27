@@ -150,6 +150,19 @@ final class ProjectStore: ObservableObject {
         isDirty = true
     }
 
+    func toggleFolderExpansion(_ folderId: UUID) {
+        guard let idx = folders.firstIndex(where: { $0.id == folderId }) else { return }
+        folders[idx].isExpanded.toggle()
+        isDirty = true
+    }
+
+    func setFolderExpanded(_ folderId: UUID, _ expanded: Bool) {
+        guard let idx = folders.firstIndex(where: { $0.id == folderId }) else { return }
+        guard folders[idx].isExpanded != expanded else { return }
+        folders[idx].isExpanded = expanded
+        isDirty = true
+    }
+
     func deleteFolder(id: UUID, recursive: Bool = false) {
         if recursive {
             let childFolderIds = folders.filter { $0.parentId == id }.map { $0.id }
