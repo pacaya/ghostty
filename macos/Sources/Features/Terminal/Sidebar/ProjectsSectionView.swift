@@ -10,6 +10,7 @@ struct ProjectsSectionView: View {
     @Binding var splitRatio: Double
     let totalHeight: CGFloat
     let headerHeight: CGFloat
+    @Binding var draggingTabID: ObjectIdentifier?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,12 +35,14 @@ struct ProjectsSectionView: View {
                 ProjectsListView(
                     projectStore: projectStore,
                     tabManager: tabManager,
-                    theme: theme
+                    theme: theme,
+                    draggingTabID: $draggingTabID
                 )
                 .onDrop(of: [UTType.text], delegate: TabToProjectDropDelegate(
                     projectStore: projectStore,
                     tabManager: tabManager,
-                    targetFolderId: nil
+                    targetFolderId: nil,
+                    draggingTabID: $draggingTabID
                 ))
             }
         }
@@ -155,13 +158,17 @@ struct TabToProjectDropDelegate: DropDelegate {
     let projectStore: ProjectStore
     let tabManager: SidebarTabManager
     let targetFolderId: UUID?
+    @Binding var draggingTabID: ObjectIdentifier?
 
     func validateDrop(info: DropInfo) -> Bool {
         info.hasItemsConforming(to: [UTType.text])
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let item = info.itemProviders(for: [UTType.text]).first else { return false }
+        guard let item = info.itemProviders(for: [UTType.text]).first else {
+            draggingTabID = nil
+            return false
+        }
 
         item.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { data, _ in
             guard let data = data as? Data,
@@ -191,6 +198,7 @@ struct TabToProjectDropDelegate: DropDelegate {
                 }
             }
         }
+        draggingTabID = nil
         return true
     }
 }

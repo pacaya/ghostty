@@ -18,6 +18,7 @@ struct ProjectsListView: View {
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var tabManager: SidebarTabManager
     var theme: SidebarTheme
+    @Binding var draggingTabID: ObjectIdentifier?
 
     @State private var draggingProjectID: UUID?
     @State private var projectDropTarget: ProjectDropTarget?
@@ -50,7 +51,10 @@ struct ProjectsListView: View {
                             projectStore: projectStore,
                             tabManager: tabManager,
                             theme: theme,
-                            depth: 0
+                            depth: 0,
+                            draggingProjectID: $draggingProjectID,
+                            projectDropTarget: $projectDropTarget,
+                            draggingTabID: $draggingTabID
                         )
                         .dragDropIndicator(itemID: folder.id, draggingID: draggingFolderID, dropTargetID: dropTargetFolderID)
                         .onDrag {
@@ -155,7 +159,10 @@ struct ProjectDropDelegate: DropDelegate {
         }
 
         // Case 2: Tab or project drop from payload
-        guard let item = info.itemProviders(for: [UTType.text]).first else { return false }
+        guard let item = info.itemProviders(for: [UTType.text]).first else {
+            projectDropTarget = nil
+            return false
+        }
 
         item.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { data, _ in
             guard let data = data as? Data,

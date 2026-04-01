@@ -12,8 +12,9 @@ struct ProjectFolderRow: View {
     @State private var isRenaming: Bool = false
     @State private var renameText: String = ""
     @FocusState private var isRenameFocused: Bool
-    @State private var draggingProjectID: UUID?
-    @State private var projectDropTarget: ProjectDropTarget?
+    @Binding var draggingProjectID: UUID?
+    @Binding var projectDropTarget: ProjectDropTarget?
+    @Binding var draggingTabID: ObjectIdentifier?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -55,6 +56,8 @@ struct ProjectFolderRow: View {
             .padding(.horizontal, 4)
             .contentShape(Rectangle())
             .onTapGesture {
+                if draggingProjectID != nil { draggingProjectID = nil }
+                if projectDropTarget != nil { projectDropTarget = nil }
                 withAnimation(.easeInOut(duration: 0.15)) {
                     projectStore.toggleFolderExpansion(folder.id)
                 }
@@ -89,7 +92,8 @@ struct ProjectFolderRow: View {
             .onDrop(of: [UTType.text], delegate: TabToProjectDropDelegate(
                 projectStore: projectStore,
                 tabManager: tabManager,
-                targetFolderId: folder.id
+                targetFolderId: folder.id,
+                draggingTabID: $draggingTabID
             ))
             .onChange(of: isRenaming) { renaming in
                 if renaming {
@@ -106,7 +110,10 @@ struct ProjectFolderRow: View {
                         projectStore: projectStore,
                         tabManager: tabManager,
                         theme: theme,
-                        depth: depth + 1
+                        depth: depth + 1,
+                        draggingProjectID: $draggingProjectID,
+                        projectDropTarget: $projectDropTarget,
+                        draggingTabID: $draggingTabID
                     )
                 }
 

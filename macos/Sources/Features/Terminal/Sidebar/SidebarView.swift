@@ -67,7 +67,7 @@ struct SidebarView: View {
 
     @AppStorage("SidebarShowCardBorder") private var showCardBorder: Bool = true
     @AppStorage("SidebarDimInactiveColors") private var dimInactiveColors: Bool = false
-    @State private var draggingTabID: ObjectIdentifier?
+    @Binding var draggingTabID: ObjectIdentifier?
     @State private var dropTargetTabID: ObjectIdentifier?
 
     var body: some View {
@@ -86,6 +86,8 @@ struct SidebarView: View {
                             }
                         }
                         .onTapGesture {
+                            if draggingTabID != nil { draggingTabID = nil }
+                            if dropTargetTabID != nil { dropTargetTabID = nil }
                             tabManager.selectTab(tab)
                         }
                         .onDrag {

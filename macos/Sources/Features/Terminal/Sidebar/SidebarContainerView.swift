@@ -10,6 +10,7 @@ struct SidebarContainerView: View {
 
     @AppStorage("SidebarProjectsExpanded") private var projectsExpanded: Bool = false
     @AppStorage("SidebarProjectsSplitRatio") private var splitRatio: Double = 0.5
+    @State private var draggingTabID: ObjectIdentifier?
 
     /// Height of the collapsed projects header bar.
     private let headerHeight: CGFloat = 28
@@ -24,7 +25,8 @@ struct SidebarContainerView: View {
                     tabManager: tabManager,
                     projectStore: projectStore,
                     theme: theme,
-                    fields: fields
+                    fields: fields,
+                    draggingTabID: $draggingTabID
                 )
                 .frame(height: tabsHeight(total: totalHeight))
 
@@ -36,7 +38,8 @@ struct SidebarContainerView: View {
                     isExpanded: $projectsExpanded,
                     splitRatio: $splitRatio,
                     totalHeight: totalHeight,
-                    headerHeight: headerHeight
+                    headerHeight: headerHeight,
+                    draggingTabID: $draggingTabID
                 )
                 .frame(height: projectsHeight(total: totalHeight))
             }
