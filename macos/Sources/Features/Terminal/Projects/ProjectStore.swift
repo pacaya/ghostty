@@ -223,12 +223,20 @@ final class ProjectStore: ObservableObject {
         let siblings = folderId == nil ? rootProjects() : projects(in: folderId!)
         guard let targetIdx = siblings.firstIndex(where: { $0.id == targetId }) else { return }
 
-        let insertIdx = edge == .top ? targetIdx : targetIdx + 1
+        // If source already lives in this list and sits before the target,
+        // removing it shifts the target up by one. Compensate so .top inserts
+        // above the target's current visual position, not the post-removal one.
+        let sourceIdx = siblings.firstIndex(where: { $0.id == projectId })
+        let adjustedTargetIdx = (sourceIdx.map { $0 < targetIdx } ?? false)
+            ? targetIdx - 1
+            : targetIdx
+
+        let insertIdx = edge == .top ? adjustedTargetIdx : adjustedTargetIdx + 1
 
         // Build ordered list, remove the project if already present, insert at correct position
         var orderedIds = siblings.map(\.id)
         orderedIds.removeAll { $0 == projectId }
-        orderedIds.insert(projectId, at: min(insertIdx, orderedIds.count))
+        orderedIds.insert(projectId, at: min(max(insertIdx, 0), orderedIds.count))
 
         // Reassign sort orders
         for (i, id) in orderedIds.enumerated() {
@@ -298,6 +306,36 @@ final class ProjectStore: ObservableObject {
         for key in associations.keys where !liveWindows.contains(key) {
             associations.removeValue(forKey: key)
         }
+    }
+
+    /// Snapshot a tab into a new project, place it in `targetFolderId`, and
+    /// associate the window with it. Optionally inserts the new project at
+    /// a specific position relative to an existing sibling.
+    @discardableResult
+    func snapshotTabIntoProject(
+        tabIndex: Int,
+        tabManager: SidebarTabManager,
+        targetFolderId: UUID?,
+        insertRelativeTo: (projectID: UUID, edge: DropEdge)? = nil
+    ) -> Project? {
+        guard tabIndex >= 0, tabIndex < tabManager.tabs.count else { return nil }
+        let tab = tabManager.tabs[tabIndex]
+        guard let controller = tab.window.windowController as? BaseTerminalController,
+              let project = snapshotFromTab(controller: controller) else { return nil }
+
+        var updated = project
+        updated.folderId = targetFolderId
+        updateProject(updated)
+        if let insert = insertRelativeTo {
+            insertProject(
+                project.id,
+                relativeTo: insert.projectID,
+                edge: insert.edge,
+                inFolder: targetFolderId
+            )
+        }
+        associate(window: tab.window, with: project.id)
+        return project
     }
 
     /// Snapshot the current state of a tab into a new or existing project.

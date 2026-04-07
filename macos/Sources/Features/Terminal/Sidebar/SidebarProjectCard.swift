@@ -96,7 +96,6 @@ struct SidebarProjectCard: View {
             .padding(.leading, 8)
             .padding(.trailing, 10)
         }
-        .padding(.leading, CGFloat(depth) * 12)
         .clipShape(RoundedRectangle(cornerRadius: Self.cardRadius))
         .background(
             RoundedRectangle(cornerRadius: Self.cardRadius)
@@ -108,6 +107,7 @@ struct SidebarProjectCard: View {
                     .strokeBorder(cardBorderColor, lineWidth: 1)
             }
         }
+        .padding(.leading, CGFloat(depth) * 12)
         .contentShape(Rectangle())
         .onTapGesture {
             openProject()

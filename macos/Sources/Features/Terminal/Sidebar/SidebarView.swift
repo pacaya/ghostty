@@ -67,8 +67,7 @@ struct SidebarView: View {
 
     @AppStorage("SidebarShowCardBorder") private var showCardBorder: Bool = true
     @AppStorage("SidebarDimInactiveColors") private var dimInactiveColors: Bool = false
-    @Binding var draggingTabID: ObjectIdentifier?
-    @State private var dropTargetTabID: ObjectIdentifier?
+    @ObservedObject var dragState: ProjectsDragState
 
     var body: some View {
         ScrollView {
@@ -76,9 +75,9 @@ struct SidebarView: View {
                 ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
                     SidebarTabCard(tab: tab, theme: theme, fields: fields, projectStore: projectStore, showCardBorder: showCardBorder, dimInactive: dimInactiveColors)
                         .contentShape(Rectangle())
-                        .opacity(draggingTabID == tab.id ? 0.4 : 1.0)
+                        .opacity(dragState.draggingItem == .tab(tab.id) ? 0.4 : 1.0)
                         .overlay(alignment: .top) {
-                            if dropTargetTabID == tab.id && draggingTabID != tab.id {
+                            if dragState.dropTargetTabID == tab.id && dragState.draggingItem != .tab(tab.id) {
                                 Rectangle()
                                     .fill(Color.accentColor)
                                     .frame(height: 2)
@@ -86,20 +85,18 @@ struct SidebarView: View {
                             }
                         }
                         .onTapGesture {
-                            if draggingTabID != nil { draggingTabID = nil }
-                            if dropTargetTabID != nil { dropTargetTabID = nil }
+                            dragState.reset()
                             tabManager.selectTab(tab)
                         }
                         .onDrag {
-                            draggingTabID = tab.id
-                            return NSItemProvider(object: "\(index)" as NSString)
+                            dragState.beginTabDrag(tab.id)
+                            return SidebarDropPayload.tab(index).itemProvider()
                         }
-                        .onDrop(of: [UTType.text], delegate: TabDropDelegate(
+                        .onDrop(of: [.ghosttySidebarItem], delegate: TabDropDelegate(
                             tabManager: tabManager,
                             currentTab: tab,
                             currentIndex: index,
-                            draggingTabID: $draggingTabID,
-                            dropTargetTabID: $dropTargetTabID
+                            dragState: dragState
                         ))
                         .contextMenu {
                             Button("Rename Tab...") {
@@ -185,35 +182,36 @@ private struct TabDropDelegate: DropDelegate {
     let tabManager: SidebarTabManager
     let currentTab: SidebarTabManager.TabItem
     let currentIndex: Int
-    @Binding var draggingTabID: ObjectIdentifier?
-    @Binding var dropTargetTabID: ObjectIdentifier?
+    let dragState: ProjectsDragState
 
     func dropEntered(info: DropInfo) {
-        dropTargetTabID = currentTab.id
+        guard dragState.isDragging else { return }
+        dragState.setDropTargetTabID(currentTab.id)
     }
 
     func dropExited(info: DropInfo) {
-        if dropTargetTabID == currentTab.id {
-            dropTargetTabID = nil
+        if dragState.dropTargetTabID == currentTab.id {
+            dragState.setDropTargetTabID(nil)
         }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
+        guard dragState.isDragging else { return DropProposal(operation: .forbidden) }
+        dragState.setDropTargetTabID(currentTab.id)
+        return DropProposal(operation: .move)
     }
 
     func validateDrop(info: DropInfo) -> Bool {
-        draggingTabID != nil && draggingTabID != currentTab.id
+        guard case .tab(let draggingTabID) = dragState.draggingItem else { return false }
+        return draggingTabID != currentTab.id
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let draggingTabID else { return false }
+        guard case .tab(let draggingTabID) = dragState.draggingItem else { return false }
         guard let sourceIndex = tabManager.tabs.firstIndex(where: { $0.id == draggingTabID }) else { return false }
 
         tabManager.moveTab(from: sourceIndex, to: currentIndex)
-
-        self.draggingTabID = nil
-        self.dropTargetTabID = nil
+        dragState.reset()
         return true
     }
 }

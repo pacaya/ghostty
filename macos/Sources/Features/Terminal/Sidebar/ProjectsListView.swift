@@ -1,31 +1,29 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Drop Position Types
-
-enum DropEdge: Equatable {
-    case top
-    case bottom
-}
-
-struct ProjectDropTarget: Equatable {
-    let projectID: UUID
-    let edge: DropEdge
-}
-
 /// Scrollable tree view of project folders and project items.
+///
+/// `dragState` is held as a `let` (not `@ObservedObject`) so this view does
+/// not re-render on every drag tick — only the leaf `…DropIndicator`
+/// wrappers observe `dragState`.
 struct ProjectsListView: View {
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var tabManager: SidebarTabManager
     var theme: SidebarTheme
-    @Binding var draggingTabID: ObjectIdentifier?
-
-    @State private var draggingProjectID: UUID?
-    @State private var projectDropTarget: ProjectDropTarget?
-    @State private var draggingFolderID: UUID?
-    @State private var dropTargetFolderID: UUID?
+    let dragState: ProjectsDragState
 
     var body: some View {
+        content
+            .onDrop(of: [.ghosttySidebarItem], delegate: TabToProjectDropDelegate(
+                projectStore: projectStore,
+                tabManager: tabManager,
+                targetFolderId: nil,
+                dragState: dragState
+            ))
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if projectStore.projects.isEmpty && projectStore.folders.isEmpty {
             // Empty state
             VStack(spacing: 4) {
@@ -46,51 +44,26 @@ struct ProjectsListView: View {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     // Root-level folders
                     ForEach(projectStore.rootFolders()) { folder in
-                        ProjectFolderRow(
+                        FolderRowDropIndicator(
                             folder: folder,
                             projectStore: projectStore,
                             tabManager: tabManager,
                             theme: theme,
                             depth: 0,
-                            draggingProjectID: $draggingProjectID,
-                            projectDropTarget: $projectDropTarget,
-                            draggingTabID: $draggingTabID
+                            dragState: dragState
                         )
-                        .dragDropIndicator(itemID: folder.id, draggingID: draggingFolderID, dropTargetID: dropTargetFolderID)
-                        .onDrag {
-                            draggingFolderID = folder.id
-                            return NSItemProvider(object: "folder:\(folder.id.uuidString)" as NSString)
-                        }
-                        .onDrop(of: [UTType.text], delegate: FolderDropDelegate(
-                            projectStore: projectStore,
-                            currentFolder: folder,
-                            draggingFolderID: $draggingFolderID,
-                            dropTargetFolderID: $dropTargetFolderID,
-                            draggingProjectID: $draggingProjectID
-                        ))
                     }
 
                     // Root-level projects
                     ForEach(projectStore.rootProjects()) { project in
-                        SidebarProjectCard(
+                        ProjectCardDropIndicator(
                             project: project,
                             projectStore: projectStore,
                             tabManager: tabManager,
                             theme: theme,
-                            depth: 0
+                            depth: 0,
+                            dragState: dragState
                         )
-                        .projectDragDropIndicator(itemID: project.id, draggingID: draggingProjectID, dropTarget: projectDropTarget)
-                        .onDrag {
-                            draggingProjectID = project.id
-                            return NSItemProvider(object: "project:\(project.id.uuidString)" as NSString)
-                        }
-                        .onDrop(of: [UTType.text], delegate: ProjectDropDelegate(
-                            projectStore: projectStore,
-                            tabManager: tabManager,
-                            currentProject: project,
-                            draggingProjectID: $draggingProjectID,
-                            projectDropTarget: $projectDropTarget
-                        ))
                     }
                 }
                 .padding(.horizontal, 8)
@@ -100,139 +73,183 @@ struct ProjectsListView: View {
     }
 }
 
+// MARK: - FolderRowDropIndicator
+
+/// Leaf wrapper that subscribes to `dragState` so only this view — not the
+/// recursive folder tree above — re-renders when drag state changes.
+struct FolderRowDropIndicator: View {
+    let folder: ProjectFolder
+    let projectStore: ProjectStore
+    let tabManager: SidebarTabManager
+    let theme: SidebarTheme
+    let depth: Int
+    @ObservedObject var dragState: ProjectsDragState
+
+    var body: some View {
+        ProjectFolderRow(
+            folder: folder,
+            projectStore: projectStore,
+            tabManager: tabManager,
+            theme: theme,
+            depth: depth,
+            dragState: dragState
+        )
+        .sidebarDropIndicator(
+            itemID: folder.id,
+            draggingID: dragState.draggingFolderUUID,
+            dropTargetID: dragState.dropTargetFolderID
+        )
+        .onDrag {
+            dragState.beginFolderDrag(folder.id)
+            return SidebarDropPayload.folder(folder.id).itemProvider()
+        }
+        .onDrop(of: [.ghosttySidebarItem], delegate: FolderDropDelegate(
+            projectStore: projectStore,
+            currentFolder: folder,
+            dragState: dragState
+        ))
+    }
+}
+
+// MARK: - ProjectCardDropIndicator
+
+/// Leaf wrapper that subscribes to `dragState` so only this view re-renders
+/// on drag updates.
+struct ProjectCardDropIndicator: View {
+    let project: Project
+    let projectStore: ProjectStore
+    let tabManager: SidebarTabManager
+    let theme: SidebarTheme
+    let depth: Int
+    @ObservedObject var dragState: ProjectsDragState
+
+    var body: some View {
+        SidebarProjectCard(
+            project: project,
+            projectStore: projectStore,
+            tabManager: tabManager,
+            theme: theme,
+            depth: depth
+        )
+        .sidebarDropIndicator(
+            itemID: project.id,
+            draggingID: dragState.draggingProjectUUID,
+            dropTargetID: dragState.projectDropTarget?.projectID,
+            edge: dragState.projectDropTarget?.edge ?? .top
+        )
+        .onDrag {
+            dragState.beginProjectDrag(project.id)
+            return SidebarDropPayload.project(project.id).itemProvider()
+        }
+        .onDrop(of: [.ghosttySidebarItem], delegate: ProjectDropDelegate(
+            projectStore: projectStore,
+            tabManager: tabManager,
+            currentProject: project,
+            dragState: dragState
+        ))
+    }
+}
+
 // MARK: - ProjectDropDelegate
 
-struct ProjectDropDelegate: DropDelegate {
-    static let defaultCardHeight: CGFloat = 40
+private struct ProjectDropDelegate: DropDelegate {
+    /// Approximate rendered height of a `SidebarProjectCard`. Used to map
+    /// the drop cursor's Y position to a top/bottom insertion edge.
+    private static let cardHeight: CGFloat = 40
 
     let projectStore: ProjectStore
     let tabManager: SidebarTabManager
     let currentProject: Project
-    var cardHeight: CGFloat = Self.defaultCardHeight
-    @Binding var draggingProjectID: UUID?
-    @Binding var projectDropTarget: ProjectDropTarget?
+    let dragState: ProjectsDragState
 
     private func edge(for info: DropInfo) -> DropEdge {
-        info.location.y < cardHeight / 2 ? .top : .bottom
+        info.location.y < Self.cardHeight / 2 ? .top : .bottom
     }
 
     func dropEntered(info: DropInfo) {
-        projectDropTarget = ProjectDropTarget(projectID: currentProject.id, edge: edge(for: info))
+        guard dragState.isDragging else { return }
+        dragState.setProjectDropTarget(ProjectDropTarget(projectID: currentProject.id, edge: edge(for: info)))
     }
 
     func dropExited(info: DropInfo) {
-        if projectDropTarget?.projectID == currentProject.id {
-            projectDropTarget = nil
+        if dragState.projectDropTarget?.projectID == currentProject.id {
+            dragState.setProjectDropTarget(nil)
         }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        let newTarget = ProjectDropTarget(projectID: currentProject.id, edge: edge(for: info))
-        if projectDropTarget != newTarget {
-            projectDropTarget = newTarget
-        }
+        guard dragState.isDragging else { return DropProposal(operation: .forbidden) }
+        dragState.setProjectDropTarget(ProjectDropTarget(projectID: currentProject.id, edge: edge(for: info)))
         return DropProposal(operation: .move)
     }
 
     func validateDrop(info: DropInfo) -> Bool {
-        // Accept project reorder
-        if let projectId = draggingProjectID {
+        switch dragState.draggingItem {
+        case .project(let projectId):
             return projectId != currentProject.id
+        case .folder, .tab, .none:
+            // Accept any in-app sidebar drop (tab → project snapshot, etc.).
+            return true
         }
-        // Accept tab drops
-        return info.hasItemsConforming(to: [UTType.text])
     }
 
     func performDrop(info: DropInfo) -> Bool {
         let insertEdge = edge(for: info)
 
-        // Case 1: Project-to-project reorder
-        if let sourceId = draggingProjectID {
-            projectStore.reorderProject(
-                fromId: sourceId,
-                toId: currentProject.id,
+        if case .project(let sourceId) = dragState.draggingItem {
+            // Same-folder reorder and cross-folder move share this path:
+            // moveProject is a no-op when source folder == target, then
+            // insertProject reassigns sortOrders.
+            projectStore.moveProject(sourceId, toFolder: currentProject.folderId)
+            projectStore.insertProject(
+                sourceId,
+                relativeTo: currentProject.id,
+                edge: insertEdge,
                 inFolder: currentProject.folderId
             )
-            draggingProjectID = nil
-            projectDropTarget = nil
+            dragState.reset()
             return true
         }
 
-        // Case 2: Tab or project drop from payload
-        guard let item = info.itemProviders(for: [UTType.text]).first else {
-            projectDropTarget = nil
-            return false
-        }
-
-        item.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { data, _ in
-            guard let data = data as? Data,
-                  let payload = String(data: data, encoding: .utf8) else { return }
-
-            Task { @MainActor in
-                if payload.hasPrefix("project:"),
-                   let projectId = UUID(uuidString: String(payload.dropFirst("project:".count))) {
-                    // Move existing project to this position
-                    projectStore.moveProject(projectId, toFolder: currentProject.folderId)
-                    projectStore.insertProject(projectId, relativeTo: currentProject.id, edge: insertEdge, inFolder: currentProject.folderId)
-                } else if let index = Int(payload) {
-                    // Tab drop: snapshot and insert at position
-                    guard index >= 0, index < tabManager.tabs.count else { return }
-                    let tab = tabManager.tabs[index]
-                    guard let controller = tab.window.windowController as? BaseTerminalController else { return }
-
-                    if let project = projectStore.snapshotFromTab(controller: controller) {
-                        var updated = project
-                        updated.folderId = currentProject.folderId
-                        projectStore.updateProject(updated)
-                        projectStore.insertProject(project.id, relativeTo: currentProject.id, edge: insertEdge, inFolder: currentProject.folderId)
-                        projectStore.associate(window: tab.window, with: project.id)
-                    }
-                }
+        let accepted = info.loadSidebarPayload { payload in
+            switch payload {
+            case .tab(let index):
+                projectStore.snapshotTabIntoProject(
+                    tabIndex: index,
+                    tabManager: tabManager,
+                    targetFolderId: currentProject.folderId,
+                    insertRelativeTo: (currentProject.id, insertEdge)
+                )
+            case .project, .folder:
+                break
             }
         }
 
-        projectDropTarget = nil
-        return true
+        dragState.reset()
+        return accepted
     }
 }
 
 // MARK: - Drag-Drop Indicators
 
 extension View {
-    /// Applies the standard drag-drop visual treatment: dims the dragged item
-    /// and shows a colored line above the current drop target.
-    func dragDropIndicator(
+    /// Dims the dragged item and shows an insertion line at the top or
+    /// bottom edge of the drop target. Pass `edge: .top` (the default) for
+    /// items that don't distinguish leading/trailing drop positions.
+    func sidebarDropIndicator(
         itemID: UUID,
         draggingID: UUID?,
-        dropTargetID: UUID?
+        dropTargetID: UUID?,
+        edge: DropEdge = .top
     ) -> some View {
         self
             .opacity(draggingID == itemID ? 0.4 : 1.0)
-            .overlay(alignment: .top) {
+            .overlay(alignment: edge == .bottom ? .bottom : .top) {
                 if dropTargetID == itemID && draggingID != itemID {
                     Rectangle()
                         .fill(Color.accentColor)
                         .frame(height: 2)
-                        .offset(y: -1)
-                }
-            }
-    }
-
-    /// Position-aware drag-drop indicator that shows the insertion line at the
-    /// top or bottom edge depending on cursor position.
-    func projectDragDropIndicator(
-        itemID: UUID,
-        draggingID: UUID?,
-        dropTarget: ProjectDropTarget?
-    ) -> some View {
-        self
-            .opacity(draggingID == itemID ? 0.4 : 1.0)
-            .overlay(alignment: dropTarget?.edge == .bottom ? .bottom : .top) {
-                if dropTarget?.projectID == itemID && draggingID != itemID {
-                    Rectangle()
-                        .fill(Color.accentColor)
-                        .frame(height: 2)
-                        .offset(y: dropTarget?.edge == .bottom ? 1 : -1)
+                        .offset(y: edge == .bottom ? 1 : -1)
                 }
             }
     }
@@ -243,54 +260,61 @@ extension View {
 private struct FolderDropDelegate: DropDelegate {
     let projectStore: ProjectStore
     let currentFolder: ProjectFolder
-    @Binding var draggingFolderID: UUID?
-    @Binding var dropTargetFolderID: UUID?
-    @Binding var draggingProjectID: UUID?
+    let dragState: ProjectsDragState
 
     func dropEntered(info: DropInfo) {
-        dropTargetFolderID = currentFolder.id
+        guard dragState.isDragging else { return }
+        dragState.setDropTargetFolderID(currentFolder.id)
     }
 
     func dropExited(info: DropInfo) {
-        if dropTargetFolderID == currentFolder.id {
-            dropTargetFolderID = nil
+        if dragState.dropTargetFolderID == currentFolder.id {
+            dragState.setDropTargetFolderID(nil)
         }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
+        guard dragState.isDragging else { return DropProposal(operation: .forbidden) }
+        return DropProposal(operation: .move)
     }
 
     func validateDrop(info: DropInfo) -> Bool {
-        // Accept folder reorder or project-into-folder drop
-        if let folderId = draggingFolderID {
-            return folderId != currentFolder.id
+        switch dragState.draggingItem {
+        case .folder(let folderId):
+            guard folderId != currentFolder.id else { return false }
+            // Only allow reordering within the same parent — `reorderFolder`
+            // operates on a single sibling list, so a cross-parent drop
+            // would silently no-op. This implicitly rejects cycles too,
+            // since a folder is never a sibling of its own descendants.
+            let sourceParentId = projectStore.folders.first(where: { $0.id == folderId })?.parentId
+            return sourceParentId == currentFolder.parentId
+        case .project:
+            return true
+        case .tab, .none:
+            return false
         }
-        return draggingProjectID != nil
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        if let sourceId = draggingFolderID {
+        switch dragState.draggingItem {
+        case .folder(let sourceId):
             projectStore.reorderFolder(
                 fromId: sourceId,
                 toId: currentFolder.id,
                 inParent: currentFolder.parentId
             )
-            draggingFolderID = nil
-            dropTargetFolderID = nil
+            dragState.reset()
             return true
-        }
-
-        if let projectId = draggingProjectID {
+        case .project(let projectId):
             projectStore.moveProject(
                 projectId,
                 toFolder: currentFolder.id,
                 atSortOrder: projectStore.nextSortOrder(in: currentFolder.id)
             )
-            draggingProjectID = nil
+            dragState.reset()
             return true
+        case .tab, .none:
+            return false
         }
-
-        return false
     }
 }

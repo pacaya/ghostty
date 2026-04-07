@@ -10,7 +10,7 @@ struct ProjectsSectionView: View {
     @Binding var splitRatio: Double
     let totalHeight: CGFloat
     let headerHeight: CGFloat
-    @Binding var draggingTabID: ObjectIdentifier?
+    let dragState: ProjectsDragState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,14 +36,8 @@ struct ProjectsSectionView: View {
                     projectStore: projectStore,
                     tabManager: tabManager,
                     theme: theme,
-                    draggingTabID: $draggingTabID
+                    dragState: dragState
                 )
-                .onDrop(of: [UTType.text], delegate: TabToProjectDropDelegate(
-                    projectStore: projectStore,
-                    tabManager: tabManager,
-                    targetFolderId: nil,
-                    draggingTabID: $draggingTabID
-                ))
             }
         }
     }
@@ -158,47 +152,33 @@ struct TabToProjectDropDelegate: DropDelegate {
     let projectStore: ProjectStore
     let tabManager: SidebarTabManager
     let targetFolderId: UUID?
-    @Binding var draggingTabID: ObjectIdentifier?
+    let dragState: ProjectsDragState
 
     func validateDrop(info: DropInfo) -> Bool {
-        info.hasItemsConforming(to: [UTType.text])
+        info.hasItemsConforming(to: [.ghosttySidebarItem])
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let item = info.itemProviders(for: [UTType.text]).first else {
-            draggingTabID = nil
-            return false
-        }
-
-        item.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { data, _ in
-            guard let data = data as? Data,
-                  let payload = String(data: data, encoding: .utf8) else { return }
-
-            Task { @MainActor in
-                if payload.hasPrefix("project:"),
-                   let projectId = UUID(uuidString: String(payload.dropFirst("project:".count))) {
-                    // Project drop: move into target folder
-                    projectStore.moveProject(
-                        projectId,
-                        toFolder: targetFolderId,
-                        atSortOrder: projectStore.nextSortOrder(in: targetFolderId)
-                    )
-                } else if let index = Int(payload) {
-                    // Tab drop: snapshot tab as new project
-                    guard index >= 0, index < tabManager.tabs.count else { return }
-                    let tab = tabManager.tabs[index]
-                    guard let controller = tab.window.windowController as? BaseTerminalController else { return }
-
-                    if let project = projectStore.snapshotFromTab(controller: controller) {
-                        var updated = project
-                        updated.folderId = targetFolderId
-                        projectStore.updateProject(updated)
-                        projectStore.associate(window: tab.window, with: project.id)
-                    }
-                }
+        let accepted = info.loadSidebarPayload { payload in
+            switch payload {
+            case .project(let projectId):
+                projectStore.moveProject(
+                    projectId,
+                    toFolder: targetFolderId,
+                    atSortOrder: projectStore.nextSortOrder(in: targetFolderId)
+                )
+            case .tab(let index):
+                projectStore.snapshotTabIntoProject(
+                    tabIndex: index,
+                    tabManager: tabManager,
+                    targetFolderId: targetFolderId
+                )
+            case .folder:
+                break
             }
         }
-        draggingTabID = nil
-        return true
+
+        dragState.reset()
+        return accepted
     }
 }

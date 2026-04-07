@@ -12,9 +12,7 @@ struct ProjectFolderRow: View {
     @State private var isRenaming: Bool = false
     @State private var renameText: String = ""
     @FocusState private var isRenameFocused: Bool
-    @Binding var draggingProjectID: UUID?
-    @Binding var projectDropTarget: ProjectDropTarget?
-    @Binding var draggingTabID: ObjectIdentifier?
+    let dragState: ProjectsDragState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -56,8 +54,7 @@ struct ProjectFolderRow: View {
             .padding(.horizontal, 4)
             .contentShape(Rectangle())
             .onTapGesture {
-                if draggingProjectID != nil { draggingProjectID = nil }
-                if projectDropTarget != nil { projectDropTarget = nil }
+                dragState.reset()
                 withAnimation(.easeInOut(duration: 0.15)) {
                     projectStore.toggleFolderExpansion(folder.id)
                 }
@@ -89,11 +86,11 @@ struct ProjectFolderRow: View {
                     projectStore.deleteFolder(id: folder.id, recursive: true)
                 }
             }
-            .onDrop(of: [UTType.text], delegate: TabToProjectDropDelegate(
+            .onDrop(of: [.ghosttySidebarItem], delegate: TabToProjectDropDelegate(
                 projectStore: projectStore,
                 tabManager: tabManager,
                 targetFolderId: folder.id,
-                draggingTabID: $draggingTabID
+                dragState: dragState
             ))
             .onChange(of: isRenaming) { renaming in
                 if renaming {
@@ -105,39 +102,26 @@ struct ProjectFolderRow: View {
             if folder.isExpanded {
                 // Child folders
                 ForEach(projectStore.childFolders(of: folder.id)) { childFolder in
-                    ProjectFolderRow(
+                    FolderRowDropIndicator(
                         folder: childFolder,
                         projectStore: projectStore,
                         tabManager: tabManager,
                         theme: theme,
                         depth: depth + 1,
-                        draggingProjectID: $draggingProjectID,
-                        projectDropTarget: $projectDropTarget,
-                        draggingTabID: $draggingTabID
+                        dragState: dragState
                     )
                 }
 
                 // Projects in this folder
                 ForEach(projectStore.projects(in: folder.id)) { project in
-                    SidebarProjectCard(
+                    ProjectCardDropIndicator(
                         project: project,
                         projectStore: projectStore,
                         tabManager: tabManager,
                         theme: theme,
-                        depth: depth + 1
+                        depth: depth + 1,
+                        dragState: dragState
                     )
-                    .projectDragDropIndicator(itemID: project.id, draggingID: draggingProjectID, dropTarget: projectDropTarget)
-                    .onDrag {
-                        draggingProjectID = project.id
-                        return NSItemProvider(object: "project:\(project.id.uuidString)" as NSString)
-                    }
-                    .onDrop(of: [UTType.text], delegate: ProjectDropDelegate(
-                        projectStore: projectStore,
-                        tabManager: tabManager,
-                        currentProject: project,
-                        draggingProjectID: $draggingProjectID,
-                        projectDropTarget: $projectDropTarget
-                    ))
                 }
             }
         }
