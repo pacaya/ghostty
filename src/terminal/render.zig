@@ -3,6 +3,7 @@ const assert = @import("../quirks.zig").inlineAssert;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const fastmem = @import("../fastmem.zig");
+const lib = @import("lib.zig");
 const color = @import("color.zig");
 const cursor = @import("cursor.zig");
 const highlight = @import("highlight.zig");
@@ -95,8 +96,8 @@ pub const RenderState = struct {
         .rows = 0,
         .cols = 0,
         .colors = .{
-            .background = .{},
-            .foreground = .{},
+            .background = .{ .r = 0, .g = 0, .b = 0 },
+            .foreground = .{ .r = 0xff, .g = 0xff, .b = 0xff },
             .cursor = null,
             .palette = color.default,
         },
@@ -222,20 +223,20 @@ pub const RenderState = struct {
         style: Style,
     };
 
-    // Dirty state
-    pub const Dirty = enum {
-        /// Not dirty at all. Can skip rendering if prior state was
-        /// already rendered.
-        false,
+    // Dirty state.
+    pub const Dirty = lib.Enum(lib.target, &.{
+        // Not dirty at all. Can skip rendering if prior state was
+        // already rendered.
+        "false",
 
-        /// Partially dirty. Some rows changed but not all. None of the
-        /// global state changed such as colors.
-        partial,
+        // Some rows changed but not all. None of the global state
+        // changed such as colors.
+        "partial",
 
-        /// Fully dirty. Global state changed or dimensions changed. All rows
-        /// should be redrawn.
-        full,
-    };
+        // Global state changed or dimensions changed. All rows should
+        // be redrawn.
+        "full",
+    });
 
     const SelectionCache = struct {
         selection: Selection,

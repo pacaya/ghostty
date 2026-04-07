@@ -19,6 +19,7 @@ const apprt = @import("../apprt.zig");
 const internal_os = @import("../os/main.zig");
 const windows = internal_os.windows;
 const configpkg = @import("../config.zig");
+const ProcessInfo = @import("../pty.zig").ProcessInfo;
 
 const log = std.log.scoped(.io_exec);
 
@@ -254,20 +255,11 @@ pub fn init(self: *Termio, alloc: Allocator, opts: termio.Options) !void {
                 },
                 .palette = .init(opts.config.palette),
             },
+            .kitty_image_storage_limit = opts.config.image_storage_limit,
+            .kitty_image_loading_limits = .all,
         };
     });
     errdefer term.deinit(alloc);
-
-    // Set the image size limits
-    var it = term.screens.all.iterator();
-    while (it.next()) |entry| {
-        const screen: *terminalpkg.Screen = entry.value.*;
-        try screen.kitty_images.setLimit(
-            alloc,
-            screen,
-            opts.config.image_storage_limit,
-        );
-    }
 
     // Set our default cursor style
     term.screens.active.cursor.cursor_style = opts.config.cursor_style;
@@ -462,16 +454,9 @@ pub fn changeConfig(self: *Termio, td: *ThreadData, config: *DerivedConfig) !voi
         break :cursor color.toTerminalRGB() orelse break :cursor null;
     };
 
-    // Set the image size limits
-    var it = self.terminal.screens.all.iterator();
-    while (it.next()) |entry| {
-        const screen: *terminalpkg.Screen = entry.value.*;
-        try screen.kitty_images.setLimit(
-            self.alloc,
-            screen,
-            config.image_storage_limit,
-        );
-    }
+    // Set the image limits
+    try self.terminal.setKittyGraphicsSizeLimit(self.alloc, config.image_storage_limit);
+    self.terminal.setKittyGraphicsLoadingLimits(.all);
 }
 
 /// Resize the terminal.
@@ -576,9 +561,8 @@ pub fn clearScreen(self: *Termio, td: *ThreadData, history: bool) !void {
         // If we're not at a prompt, we just delete above the cursor.
         if (!self.terminal.cursorIsAtPrompt()) {
             if (self.terminal.screens.active.cursor.y > 0) {
-                self.terminal.screens.active.eraseRows(
-                    .{ .active = .{ .y = 0 } },
-                    .{ .active = .{ .y = self.terminal.screens.active.cursor.y - 1 } },
+                self.terminal.screens.active.eraseActive(
+                    self.terminal.screens.active.cursor.y - 1,
                 );
             }
 
@@ -764,3 +748,10 @@ pub const ThreadData = struct {
         self.* = undefined;
     }
 };
+
+/// Get information about the process(es) attached to the backend. Returns
+/// `null` if there was an error getting the information or the information is
+/// not available on a particular platform.
+pub fn getProcessInfo(self: *Termio, comptime info: ProcessInfo) ?ProcessInfo.Type(info) {
+    return self.backend.getProcessInfo(info);
+}
