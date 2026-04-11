@@ -527,13 +527,14 @@ class TerminalWindow: NSWindow {
 
             // If our focused surface borders the top then we prefer its background color
             if let focusedSurface = terminalController.focusedSurface,
+               let focusedLeaf = terminalController.surfaceTree.leaf(for: focusedSurface),
                let treeRoot = terminalController.surfaceTree.root,
-               let focusedNode = treeRoot.node(view: focusedSurface),
+               let focusedNode = treeRoot.node(view: focusedLeaf),
                treeRoot.spatial().doesBorder(side: .up, from: focusedNode) {
                 surface = focusedSurface
             } else {
                 // If it doesn't border the top, we use the top-left leaf
-                surface = terminalController.surfaceTree.root?.leftmostLeaf()
+                surface = terminalController.surfaceTree.root?.leftmostLeaf().terminal
             }
 
             if let surface {

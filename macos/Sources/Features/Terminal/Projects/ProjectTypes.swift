@@ -1,14 +1,46 @@
 import Foundation
 
 /// A lightweight tree describing split geometry and working directories.
-/// Mirrors `SplitTree<Ghostty.SurfaceView>.Node` but stores only the data
-/// needed to reconstruct a layout, not live NSView references.
+/// Mirrors `SplitTree<PaneLeaf>.Node` but stores only the data needed to
+/// reconstruct a layout, not live NSView references.
 indirect enum ProjectLayoutNode: Codable, Equatable {
     case leaf(ProjectLeaf)
     case split(ProjectSplit)
 
+    enum ProjectLeafKind: String, Codable, Equatable {
+        case terminal
+        case browser
+    }
+
     struct ProjectLeaf: Codable, Equatable {
+        /// Working directory for a terminal leaf. Ignored for browser leaves.
         let workingDirectory: String
+
+        /// Leaf kind. Defaults to `.terminal` when absent in persisted JSON
+        /// so older project files continue to decode.
+        let kind: ProjectLeafKind
+
+        /// URL for a browser leaf. `nil` for terminal leaves.
+        let url: String?
+
+        init(workingDirectory: String, kind: ProjectLeafKind = .terminal, url: String? = nil) {
+            self.workingDirectory = workingDirectory
+            self.kind = kind
+            self.url = url
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case workingDirectory
+            case kind
+            case url
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            workingDirectory = try container.decodeIfPresent(String.self, forKey: .workingDirectory) ?? "~"
+            kind = try container.decodeIfPresent(ProjectLeafKind.self, forKey: .kind) ?? .terminal
+            url = try container.decodeIfPresent(String.self, forKey: .url)
+        }
     }
 
     struct ProjectSplit: Codable, Equatable {

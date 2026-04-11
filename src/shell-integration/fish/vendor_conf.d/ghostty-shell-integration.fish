@@ -201,6 +201,15 @@ function __ghostty_setup --on-event fish_prompt -d "Setup ghostty integration"
         end
     end
 
+    # Route `open <http(s) URL>` to a Ghostty browser pane (macOS only).
+    # The shim handles URL detection, flag passthrough (`-a`, `-g`, …),
+    # and graceful fallback to /usr/bin/open for non-URL or IPC failure cases.
+    if test (uname) = Darwin; and test -x "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh"
+        function open --description "Route http(s) URLs to a Ghostty browser pane"
+            "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh" $argv
+        end
+    end
+
     # Setup prompt marking
     function __ghostty_mark_prompt_start --on-event fish_prompt --on-event fish_posterror
         # If we never got the output end event, then we need to send it now.

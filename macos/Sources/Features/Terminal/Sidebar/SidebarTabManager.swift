@@ -191,7 +191,7 @@ class SidebarTabManager: ObservableObject {
             let entries = sid.map { metadataStore.statusEntries(for: $0) } ?? []
             let branch = pwd.flatMap { gitBranch(at: $0) }
             let color = (w as? TerminalWindow)?.tabColor ?? .none
-            let hasRunningProcess = controller?.surfaceTree.contains(where: { $0.needsConfirmQuit }) ?? false
+            let hasRunningProcess = controller?.surfaceTree.contains(where: { $0.terminal?.needsConfirmQuit == true }) ?? false
 
             return TabItem(
                 id: wid,

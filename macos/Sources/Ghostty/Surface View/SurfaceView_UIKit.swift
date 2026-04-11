@@ -64,6 +64,13 @@ extension Ghostty {
 
         private(set) var surface: ghostty_surface_t?
 
+        /// The Zig-side u64 surface ID (matches child processes' $GHOSTTY_SURFACE_ID).
+        /// Returns 0 if the surface is not yet realized.
+        var zigId: UInt64 {
+            guard let surface else { return 0 }
+            return ghostty_surface_id(surface)
+        }
+
         init(_ app: ghostty_app_t, baseConfig: SurfaceConfiguration? = nil, uuid: UUID? = nil) {
             self.id = uuid ?? .init()
 

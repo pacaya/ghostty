@@ -237,8 +237,26 @@ final class GhosttyIPCServer {
             handleTabList(client: client)
         case "tab.current":
             handleTabCurrent(client: client)
+        case "pane.new-browser-split":
+            handleNewBrowserSplit(params: params, client: client)
         default:
             sendError("unknown method: \(method)", to: client)
+        }
+    }
+
+    private func handleNewBrowserSplit(params: [String: Any], client: ClientConnection) {
+        do {
+            let data = try JSONSerialization.data(withJSONObject: params)
+            let command = try JSONDecoder().decode(
+                BrowserIPCCommand.NewBrowserSplitCommand.self,
+                from: data
+            )
+            try BrowserIPCCommand.handle(command)
+            sendOk(["split_created": true], to: client)
+        } catch let error as BrowserIPCCommand.HandlerError {
+            sendError(error.description, to: client)
+        } catch {
+            sendError("pane.new-browser-split: \(error)", to: client)
         }
     }
 

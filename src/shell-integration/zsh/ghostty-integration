@@ -382,6 +382,15 @@ _ghostty_deferred_init() {
       }
     fi
 
+    # Route `open <http(s) URL>` to a Ghostty browser pane (macOS only).
+    # The shim handles URL detection, flag passthrough (`-a`, `-g`, …),
+    # and graceful fallback to /usr/bin/open for non-URL or IPC failure cases.
+    if [[ "$OSTYPE" == darwin* ]] && [[ -x "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh" ]]; then
+      function open() {
+        "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh" "$@"
+      }
+    fi
+
     # Some zsh users manually run `source ~/.zshrc` in order to apply rc file
     # changes to the current shell. This is a terrible practice that breaks many
     # things, including our shell integration. For example, Oh My Zsh and Prezto

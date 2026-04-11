@@ -142,17 +142,17 @@ struct TerminalCommandPaletteView: View {
             let color = (window as? TerminalWindow)?.tabColor
             let displayColor = color != TerminalTabColor.none ? color : nil
 
-            return controller.surfaceTree.map { surface in
-                let terminalTitle = surface.title.isEmpty ? window.title : surface.title
+            return controller.surfaceTree.map { leaf in
+                let resolvedTitle = leaf.title.isEmpty ? window.title : leaf.title
                 let displayTitle: String
                 if let override = controller.titleOverride, !override.isEmpty {
                     displayTitle = override
-                } else if !terminalTitle.isEmpty {
-                    displayTitle = terminalTitle
+                } else if !resolvedTitle.isEmpty {
+                    displayTitle = resolvedTitle
                 } else {
                     displayTitle = "Untitled"
                 }
-                let pwd = surface.pwd?.abbreviatedPath
+                let pwd = leaf.terminal?.pwd?.abbreviatedPath
                 let subtitle: String? = if let pwd, !displayTitle.contains(pwd) {
                     pwd
                 } else {
@@ -164,11 +164,11 @@ struct TerminalCommandPaletteView: View {
                     subtitle: subtitle,
                     leadingIcon: "rectangle.on.rectangle",
                     leadingColor: displayColor?.displayColor.map { Color($0) },
-                    sortKey: AnySortKey(ObjectIdentifier(surface))
+                    sortKey: AnySortKey(ObjectIdentifier(leaf))
                 ) {
                     NotificationCenter.default.post(
                         name: Ghostty.Notification.ghosttyPresentTerminal,
-                        object: surface
+                        object: leaf.terminal ?? leaf
                     )
                 }
             }

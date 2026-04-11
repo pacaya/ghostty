@@ -1104,6 +1104,10 @@ GHOSTTY_API ghostty_surface_t ghostty_surface_new(ghostty_app_t,
 GHOSTTY_API void ghostty_surface_free(ghostty_surface_t);
 GHOSTTY_API void* ghostty_surface_userdata(ghostty_surface_t);
 GHOSTTY_API ghostty_app_t ghostty_surface_app(ghostty_surface_t);
+// Return the unique u64 ID of a surface. This matches the value exposed
+// to child processes via the GHOSTTY_SURFACE_ID environment variable.
+// Never returns 0 for a valid surface.
+GHOSTTY_API uint64_t ghostty_surface_id(ghostty_surface_t);
 GHOSTTY_API ghostty_surface_config_s ghostty_surface_inherited_config(ghostty_surface_t, ghostty_surface_context_e);
 GHOSTTY_API void ghostty_surface_update_config(ghostty_surface_t, ghostty_config_t);
 GHOSTTY_API bool ghostty_surface_needs_confirm_quit(ghostty_surface_t);

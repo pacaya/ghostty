@@ -183,6 +183,15 @@ if [[ "$GHOSTTY_SHELL_FEATURES" == *ssh-* ]]; then
   }
 fi
 
+# Route `open <http(s) URL>` to a Ghostty browser pane (macOS only).
+# The shim handles URL detection, flag passthrough (`-a`, `-g`, …),
+# and graceful fallback to /usr/bin/open for non-URL or IPC failure cases.
+if [[ "$OSTYPE" == darwin* ]] && [[ -x "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh" ]]; then
+  function open() {
+    "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh" "$@"
+  }
+fi
+
 # This is set to 1 when we're executing a command so that we don't
 # send prompt marks multiple times.
 _ghostty_executing=""

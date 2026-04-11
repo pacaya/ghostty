@@ -319,7 +319,7 @@ extension NSApplication {
     /// terminal windows. This powers both terminal enumeration and ID lookup.
     fileprivate var allSurfaceViews: [Ghostty.SurfaceView] {
         allTerminalControllers
-            .flatMap { $0.surfaceTree.root?.leaves() ?? [] }
+            .flatMap { ($0.surfaceTree.root?.leaves() ?? []).compactMap { $0.terminal } }
     }
 
     /// All terminal controllers in undefined order.

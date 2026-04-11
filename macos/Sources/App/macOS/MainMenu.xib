@@ -215,6 +215,31 @@
                                     <action selector="closeAllWindows:" target="-1" id="hrz-eb-l5t"/>
                                 </connections>
                             </menuItem>
+                            <menuItem isSeparatorItem="YES" id="bWp-7v-9Hq"/>
+                            <menuItem title="New Browser Split Right" keyEquivalent="d" id="hQr-0b-n8A">
+                                <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                <connections>
+                                    <action selector="newBrowserSplitRight:" target="-1" id="kZy-4p-v6M"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="New Browser Split Down" id="tFs-8d-3Lw">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="newBrowserSplitDown:" target="-1" id="xRp-2k-9Jv"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="New Browser Split Left" id="wEn-5c-7Yz">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="newBrowserSplitLeft:" target="-1" id="pLq-3b-6Xm"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="New Browser Split Up" id="gJt-1h-4Qa">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="newBrowserSplitUp:" target="-1" id="yHf-9s-2Vd"/>
+                                </connections>
+                            </menuItem>
                         </items>
                     </menu>
                 </menuItem>

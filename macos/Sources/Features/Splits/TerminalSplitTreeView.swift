@@ -9,7 +9,7 @@ enum TerminalSplitOperation {
     case drop(Drop)
 
     struct Resize {
-        let node: SplitTree<Ghostty.SurfaceView>.Node
+        let node: SplitTree<PaneLeaf>.Node
         let ratio: Double
     }
 
@@ -26,7 +26,7 @@ enum TerminalSplitOperation {
 }
 
 struct TerminalSplitTreeView: View {
-    let tree: SplitTree<Ghostty.SurfaceView>
+    let tree: SplitTree<PaneLeaf>
     let action: (TerminalSplitOperation) -> Void
 
     var body: some View {
@@ -47,14 +47,14 @@ struct TerminalSplitTreeView: View {
 private struct TerminalSplitSubtreeView: View {
     @EnvironmentObject var ghostty: Ghostty.App
 
-    let node: SplitTree<Ghostty.SurfaceView>.Node
+    let node: SplitTree<PaneLeaf>.Node
     var isRoot: Bool = false
     let action: (TerminalSplitOperation) -> Void
 
     var body: some View {
         switch node {
-        case .leaf(let leafView):
-            TerminalSplitLeaf(surfaceView: leafView, isSplit: !isRoot, action: action)
+        case .leaf(let leaf):
+            TerminalSplitLeaf(leaf: leaf, isSplit: !isRoot, action: action)
 
         case .split(let split):
             let splitViewDirection: SplitViewDirection = switch split.direction {
@@ -78,7 +78,7 @@ private struct TerminalSplitSubtreeView: View {
                     TerminalSplitSubtreeView(node: split.right, action: action)
                 },
                 onEqualize: {
-                    guard let surface = node.leftmostLeaf().surface else { return }
+                    guard let surface = node.leftmostLeaf().terminal?.surface else { return }
                     ghostty.splitEqualize(surface: surface)
                 }
             )
@@ -87,7 +87,7 @@ private struct TerminalSplitSubtreeView: View {
 }
 
 private struct TerminalSplitLeaf: View {
-    let surfaceView: Ghostty.SurfaceView
+    let leaf: PaneLeaf
     let isSplit: Bool
     let action: (TerminalSplitOperation) -> Void
 
@@ -96,37 +96,43 @@ private struct TerminalSplitLeaf: View {
 
     var body: some View {
         GeometryReader { geometry in
-            Ghostty.InspectableSurface(
-                surfaceView: surfaceView,
-                isSplit: isSplit)
-            .background {
-                // If we're dragging ourself, we hide the entire drop zone. This makes
-                // it so that a released drop animates back to its source properly
-                // so it is a proper invalid drop zone.
-                if !isSelfDragging {
-                    Color.clear
-                        .onDrop(of: [.ghosttySurfaceId], delegate: SplitDropDelegate(
-                            dropState: $dropState,
-                            viewSize: geometry.size,
-                            destinationSurface: surfaceView,
-                            action: action
-                        ))
+            if let terminal = leaf.terminal {
+                Ghostty.InspectableSurface(
+                    surfaceView: terminal,
+                    isSplit: isSplit)
+                .background {
+                    // If we're dragging ourself, we hide the entire drop zone. This makes
+                    // it so that a released drop animates back to its source properly
+                    // so it is a proper invalid drop zone.
+                    if !isSelfDragging {
+                        Color.clear
+                            .onDrop(of: [.ghosttySurfaceId], delegate: SplitDropDelegate(
+                                dropState: $dropState,
+                                viewSize: geometry.size,
+                                destinationSurface: terminal,
+                                action: action
+                            ))
+                    }
                 }
-            }
-            .overlay {
-                if !isSelfDragging, case .dropping(let zone) = dropState {
-                    zone.overlay(in: geometry)
-                        .allowsHitTesting(false)
+                .overlay {
+                    if !isSelfDragging, case .dropping(let zone) = dropState {
+                        zone.overlay(in: geometry)
+                            .allowsHitTesting(false)
+                    }
                 }
-            }
-            .onPreferenceChange(Ghostty.DraggingSurfaceKey.self) { value in
-                isSelfDragging = value == surfaceView.id
-                if isSelfDragging {
-                    dropState = .idle
+                .onPreferenceChange(Ghostty.DraggingSurfaceKey.self) { value in
+                    isSelfDragging = value == terminal.id
+                    if isSelfDragging {
+                        dropState = .idle
+                    }
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Terminal pane")
+            } else if let browser = leaf.browser {
+                BrowserPaneHost(container: browser)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Browser pane")
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Terminal pane")
         }
     }
 
@@ -254,4 +260,14 @@ enum TerminalSplitDropZone: String, Equatable {
             }
         }
     }
+}
+
+private struct BrowserPaneHost: NSViewRepresentable {
+    let container: BrowserPaneContainer
+
+    func makeNSView(context: Context) -> BrowserPaneContainer {
+        container
+    }
+
+    func updateNSView(_ nsView: BrowserPaneContainer, context: Context) {}
 }

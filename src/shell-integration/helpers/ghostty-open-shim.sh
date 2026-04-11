@@ -1,0 +1,156 @@
+#!/bin/sh
+# ghostty-open-shim.sh
+#
+# Purpose:
+#   A thin `open(1)` replacement that redirects http(s) URLs into a Ghostty
+#   browser split when invoked from inside a Ghostty surface. When not running
+#   inside Ghostty (or when opening non-URL arguments like apps or files), it
+#   transparently forwards to the real /usr/bin/open.
+#
+# Activation:
+#   This script is bundled inside the Ghostty.app resources at
+#   $GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh and
+#   is invoked automatically by an `open` shell function defined in Ghostty's
+#   zsh/bash/fish shell integration scripts. No manual setup or symlinking is
+#   required — opening a new Ghostty terminal with shell integration enabled
+#   is sufficient on macOS.
+#
+# Transport:
+#   The shim talks directly to Ghostty's IPC server (GhosttyIPCServer), a
+#   Unix domain socket at /tmp/ghostty-$(id -u).sock that speaks
+#   newline-delimited JSON. We send a `pane.new-browser-split` request and
+#   read a single JSON response line. The request's `source_surface` param
+#   carries $GHOSTTY_SURFACE_ID so the split is anchored on *this* surface
+#   regardless of which app is currently frontmost. No `ghostty cli`
+#   subcommand is required or invoked — that subcommand does not exist.
+#
+# Behavior:
+#   - If $GHOSTTY_SURFACE_ID is unset, forward all args to /usr/bin/open.
+#   - If any argument looks like a flag (starts with `-`, e.g. `-g`, `-a`),
+#     forward the entire argv unchanged to /usr/bin/open so flag semantics
+#     such as `open -g URL` stay intact.
+#   - Otherwise, for each plain http(s) URL argument, send a
+#     `pane.new-browser-split` request over the IPC socket. Non-URL args are
+#     passed to /usr/bin/open.
+#   - If the IPC socket is missing, or `/usr/bin/nc` is unavailable, or the
+#     IPC call fails, fall back to /usr/bin/open for that argument and emit a
+#     single-line warning on stderr so the failure is never silent.
+
+REAL_OPEN=/usr/bin/open
+NC=/usr/bin/nc
+
+# Not inside a Ghostty surface: act as a plain `open` passthrough.
+if [ -z "${GHOSTTY_SURFACE_ID:-}" ]; then
+    exec "$REAL_OPEN" "$@"
+fi
+
+# If any argument is a flag, don't try to parse/split the invocation. Forward
+# the whole argv to /usr/bin/open unchanged. This preserves flag semantics
+# like `open -g https://example.com` and `open -a Safari https://example.com`,
+# both of which would otherwise be mis-split across the IPC path.
+for arg in "$@"; do
+    case "$arg" in
+        -*)
+            exec "$REAL_OPEN" "$@"
+            ;;
+    esac
+done
+
+# Find the first argument to decide whether this invocation targets an
+# http(s) URL at all. If it doesn't, forward everything untouched so we
+# don't hijack `open /Applications/Foo.app`, `open ./file.txt`, etc.
+first_arg="${1:-}"
+case "$first_arg" in
+    http://*|https://*) ;;
+    *)
+        exec "$REAL_OPEN" "$@"
+        ;;
+esac
+
+# Resolve the IPC socket path. If nc or the socket is missing we cannot use
+# the IPC transport; fall back to /usr/bin/open and warn once on stderr.
+uid=$(id -u 2>/dev/null)
+SOCK="/tmp/ghostty-${uid}.sock"
+
+ipc_available=1
+if [ ! -x "$NC" ]; then
+    ipc_available=0
+fi
+if [ ! -S "$SOCK" ]; then
+    ipc_available=0
+fi
+
+if [ "$ipc_available" -eq 0 ]; then
+    printf 'ghostty-open-shim: Ghostty IPC socket unavailable (%s); falling back to %s\n' \
+        "$SOCK" "$REAL_OPEN" >&2
+    exec "$REAL_OPEN" "$@"
+fi
+
+# Minimal JSON string escaper: backslash, double quote, and control chars.
+# Pure sh/awk so we don't need jq.
+json_escape() {
+    printf '%s' "$1" | awk '
+    BEGIN { RS="" }
+    {
+        gsub(/\\/, "\\\\")
+        gsub(/"/,  "\\\"")
+        gsub(/\n/, "\\n")
+        gsub(/\r/, "\\r")
+        gsub(/\t/, "\\t")
+        printf "%s", $0
+    }'
+}
+
+send_browser_split() {
+    url=$1
+    esc_url=$(json_escape "$url")
+    # Pin the anchor to *this* surface via $GHOSTTY_SURFACE_ID so the split
+    # always targets the pane the user typed `open` in — never mis-routed to
+    # whichever window happens to be frontmost when the IPC arrives. Zig sets
+    # this var unconditionally in every surface's shell, in the hex format
+    # the server decodes (`0x%016x`).
+    payload=$(printf '{"method":"pane.new-browser-split","params":{"url":"%s","direction":"right","source_surface":"%s"}}' \
+        "$esc_url" "$GHOSTTY_SURFACE_ID")
+    # -U unix socket, -w short overall timeout so we don't hang the shell if
+    # Ghostty is wedged. Capture the response so we can distinguish a server
+    # error (`"ok":false`) from a successful split — nc exits 0 on a clean
+    # disconnect whether or not the server liked the request. The trailing
+    # newline is what signals the server to process the buffered line; we add
+    # it with `%s\n` here because command substitution would otherwise have
+    # stripped it from `$payload`.
+    response=$(printf '%s\n' "$payload" | "$NC" -U -w 2 "$SOCK" 2>/dev/null)
+    nc_rc=$?
+    if [ "$nc_rc" -ne 0 ]; then
+        return "$nc_rc"
+    fi
+    case "$response" in
+        *'"ok":true'*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Dispatch: http(s) URLs -> IPC browser-open, anything else -> /usr/bin/open.
+status=0
+for arg in "$@"; do
+    case "$arg" in
+        http://*|https://*)
+            if send_browser_split "$arg"; then
+                rc=0
+            else
+                printf 'ghostty-open-shim: IPC call failed for %s; falling back to %s\n' \
+                    "$arg" "$REAL_OPEN" >&2
+                "$REAL_OPEN" "$arg"
+                rc=$?
+            fi
+            ;;
+        *)
+            "$REAL_OPEN" "$arg"
+            rc=$?
+            ;;
+    esac
+    if [ "$rc" -ne 0 ]; then
+        status=$rc
+    fi
+done
+
+exit "$status"
