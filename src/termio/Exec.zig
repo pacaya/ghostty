@@ -736,6 +736,28 @@ const Subprocess = struct {
             } else |err| {
                 log.warn("error building {s}; man pages may not be available; err={}", .{ manpath_key, err });
             }
+
+            // Prepend our shell-integration bin dir to PATH so child
+            // processes inherit the `open` shim via execvp — not just
+            // interactive shells. Without this, a tool that calls
+            // `open https://…` directly (via execvp, not through a shell)
+            // bypasses the shim entirely and the URL escapes to the system
+            // default browser instead of landing in a browser pane.
+            // Gated on shell-integration so `none` stays vanilla.
+            if (cfg.shell_integration != .none) {
+                if (std.fmt.bufPrint(&buf, "{s}/shell-integration/bin", .{resources_dir})) |shim_bin| {
+                    try env.put(
+                        "PATH",
+                        try internal_os.prependEnv(
+                            alloc,
+                            env.get("PATH") orelse "",
+                            shim_bin,
+                        ),
+                    );
+                } else |err| {
+                    log.warn("error building shell-integration bin dir; open(1) shim disabled; err={}", .{err});
+                }
+            }
         }
 
         // Set environment variables used by some programs (such as neovim) to detect

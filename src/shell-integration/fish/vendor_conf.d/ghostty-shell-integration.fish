@@ -94,6 +94,31 @@ function __ghostty_setup --on-event fish_prompt -d "Setup ghostty integration"
         fish_add_path --global --path --append "$GHOSTTY_BIN_DIR"
     end
 
+    # On macOS, force the shell-integration/bin directory to the front of
+    # PATH so its `open` shim wins over /usr/bin/open. Ghostty prepends it
+    # in Exec.zig, but path_helper (invoked from Homebrew's config.fish or
+    # /etc/profile) rewrites PATH from scratch: it preserves the shim entry
+    # but moves it behind /usr/bin, so a plain `contains` check silently
+    # no-ops. __ghostty_setup runs on fish_prompt (after config.fish), so we
+    # use `--move` to unconditionally strip existing occurrences and
+    # re-prepend, guaranteeing the shim is found first by children we
+    # execvp (node CLIs, python tools, etc.).
+    #
+    # We also define an `open` shell function that calls the shim by absolute
+    # path. Functions beat PATH lookups, so interactive `open URL` keeps
+    # working even if another config.fish ran before ours and cached `open`.
+    if test (uname) = Darwin; and test -n "$GHOSTTY_RESOURCES_DIR"
+        set -l shim_bin "$GHOSTTY_RESOURCES_DIR/shell-integration/bin"
+        if test -d "$shim_bin"
+            fish_add_path --global --move --prepend --path "$shim_bin"
+        end
+        if test -x "$shim_bin/open"
+            function open --description "Route http(s) URLs to a Ghostty browser pane"
+                "$GHOSTTY_RESOURCES_DIR/shell-integration/bin/open" $argv
+            end
+        end
+    end
+
     # When using sudo shell integration feature, ensure $TERMINFO is set
     # and `sudo` is not already a function or alias
     if contains sudo $features; and test -n "$TERMINFO"; and test file = (type -t sudo 2> /dev/null; or echo "x")

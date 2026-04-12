@@ -115,7 +115,7 @@ struct TerminalQuery: EntityStringQuery, EnumerableEntityQuery {
 
         // Get all our surfaces
         return controllers.flatMap {
-            $0.surfaceTree.root?.leaves() ?? []
+            ($0.surfaceTree.root?.leaves() ?? []).compactMap { $0.terminal }
         }
     }
 }

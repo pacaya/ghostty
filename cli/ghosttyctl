@@ -29,7 +29,9 @@ Commands:
 Environment:
   GHOSTTY_SOCKET   Override the IPC socket path
                    (default: /tmp/ghostty-<uid>.sock)
-  GHOSTTY_TAB_ID   If set, targets that specific tab
+  GHOSTTY_TAB_ID   If set, targets that specific tab (must be a
+                   Swift tab-id UUID from `tab.current` — not the
+                   Zig-side $GHOSTTY_SURFACE_ID env var)
 
 Options:
   --help, -h       Show this help message

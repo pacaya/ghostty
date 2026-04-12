@@ -1569,6 +1569,13 @@ pub const CAPI = struct {
         return surface.app;
     }
 
+    /// Returns the unique u64 surface ID. This is the same value exposed
+    /// to child processes via the GHOSTTY_SURFACE_ID environment variable
+    /// and can be used to correlate a surface with its child process.
+    export fn ghostty_surface_id(surface: *Surface) u64 {
+        return surface.core_surface.id;
+    }
+
     /// Returns the config to use for surfaces that inherit from this one.
     export fn ghostty_surface_inherited_config(
         surface: *Surface,

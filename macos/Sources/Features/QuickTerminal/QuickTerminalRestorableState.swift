@@ -4,7 +4,7 @@ struct QuickTerminalRestorableState: TerminalRestorable {
     static var version: Int { 1 }
 
     let focusedSurface: String?
-    let surfaceTree: SplitTree<Ghostty.SurfaceView>
+    let surfaceTree: SplitTree<PaneLeaf>
     let screenStateEntries: QuickTerminalScreenStateCache.Entries
 
     init(from controller: QuickTerminalController) {

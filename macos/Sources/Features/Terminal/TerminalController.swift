@@ -73,7 +73,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     init(_ ghostty: Ghostty.App,
          withBaseConfig base: Ghostty.SurfaceConfiguration? = nil,
-         withSurfaceTree tree: SplitTree<Ghostty.SurfaceView>? = nil,
+         withSurfaceTree tree: SplitTree<PaneLeaf>? = nil,
          parent: NSWindow? = nil
     ) {
         // The window we manage is not restorable if we've specified a command
@@ -178,7 +178,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     // MARK: Base Controller Overrides
 
-    override func surfaceTreeDidChange(from: SplitTree<Ghostty.SurfaceView>, to: SplitTree<Ghostty.SurfaceView>) {
+    override func surfaceTreeDidChange(from: SplitTree<PaneLeaf>, to: SplitTree<PaneLeaf>) {
         super.surfaceTreeDidChange(from: from, to: to)
 
         // Whenever our surface tree changes in any way (new split, close split, etc.)
@@ -197,7 +197,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     }
 
     override func replaceSurfaceTree(
-        _ newTree: SplitTree<Ghostty.SurfaceView>,
+        _ newTree: SplitTree<PaneLeaf>,
         moveFocusTo newView: Ghostty.SurfaceView? = nil,
         moveFocusFrom oldView: Ghostty.SurfaceView? = nil,
         undoAction: String? = nil
@@ -346,7 +346,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     ///               If nil, the window will cascade from the last cascade point.
     static func newWindow(
         _ ghostty: Ghostty.App,
-        tree: SplitTree<Ghostty.SurfaceView>,
+        tree: SplitTree<PaneLeaf>,
         position: NSPoint? = nil,
         confirmUndo: Bool = true,
     ) -> TerminalController {
@@ -687,7 +687,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     /// This is called anytime a node in the surface tree is being removed.
     override func closeSurface(
-        _ node: SplitTree<Ghostty.SurfaceView>.Node,
+        _ node: SplitTree<PaneLeaf>.Node,
         withConfirmation: Bool = true
     ) {
         // If this isn't the root then we're dealing with a split closure.
@@ -971,9 +971,9 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // needs quit confirmation. This lets us attach the confirmation to something
         // that is running.
         guard let confirmWindow = all
-            .first(where: { $0.surfaceTree.contains(where: { $0.needsConfirmQuit }) })?
-            .surfaceTree.first(where: { $0.needsConfirmQuit })?
-            .window
+            .first(where: { $0.surfaceTree.contains(where: { $0.terminal?.needsConfirmQuit == true }) })?
+            .surfaceTree.first(where: { $0.terminal?.needsConfirmQuit == true })?
+            .terminal?.window
         else {
             closeAllWindowsImmediately()
             return
@@ -1008,7 +1008,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     /// The state that we require to recreate a TerminalController from an undo.
     struct UndoState {
         let frame: NSRect
-        let surfaceTree: SplitTree<Ghostty.SurfaceView>
+        let surfaceTree: SplitTree<PaneLeaf>
         let focusedSurface: UUID?
         let tabIndex: Int?
         weak var tabGroup: NSWindowTabGroup?
@@ -1043,11 +1043,11 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
             // Restore focus to the previously focused surface
             if let focusedUUID = undoState.focusedSurface,
-               let focusTarget = surfaceTree.first(where: { $0.id == focusedUUID }) {
+               let focusTarget = surfaceTree.first(where: { $0.id == focusedUUID })?.terminal {
                 DispatchQueue.main.async {
                     Ghostty.moveFocus(to: focusTarget, from: nil)
                 }
-            } else if let focusedSurface = surfaceTree.first {
+            } else if let focusedSurface = surfaceTree.first?.terminal {
                 // No prior focused surface or we can't find it, let's focus
                 // the first.
                 self.focusedSurface = focusedSurface
@@ -1097,7 +1097,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
         // If we have only a single surface (no splits) and there is a default size then
         // we should resize to that default size.
-        if case let .leaf(view) = surfaceTree.root {
+        if case let .leaf(leaf) = surfaceTree.root, let view = leaf.terminal {
             // If this is our first surface then our focused surface will be nil
             // so we force the focused surface to the leaf.
             focusedSurface = view
@@ -1382,7 +1382,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             return
         }
 
-        guard surfaceTree.contains(where: { $0.needsConfirmQuit }) else {
+        guard surfaceTree.contains(where: { $0.terminal?.needsConfirmQuit == true }) else {
             closeTabImmediately()
             return
         }
@@ -1413,7 +1413,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             }
 
             // Check if any surfaces require confirmation
-            return controller.surfaceTree.contains(where: { $0.needsConfirmQuit })
+            return controller.surfaceTree.contains(where: { $0.terminal?.needsConfirmQuit == true })
         }) else {
             self.closeOtherTabsImmediately()
             return
@@ -1440,7 +1440,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
                 return false
             }
 
-            return controller.surfaceTree.contains(where: { $0.needsConfirmQuit })
+            return controller.surfaceTree.contains(where: { $0.terminal?.needsConfirmQuit == true })
         }
 
         if !needsConfirm {
@@ -1470,7 +1470,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         let windows: [NSWindow] = window.tabGroup?.windows ?? [window]
         guard let confirmController = windows
             .compactMap({ $0.windowController as? TerminalController })
-            .first(where: { $0.surfaceTree.contains(where: { $0.needsConfirmQuit }) })
+            .first(where: { $0.surfaceTree.contains(where: { $0.terminal?.needsConfirmQuit == true }) })
         else {
             closeWindowImmediately()
             return
@@ -1647,31 +1647,31 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     @objc private func onCloseTab(notification: SwiftUI.Notification) {
         guard let target = notification.object as? Ghostty.SurfaceView else { return }
-        guard surfaceTree.contains(target) else { return }
+        guard surfaceTree.containsTerminal(target) else { return }
         closeTab(self)
     }
 
     @objc private func onCloseOtherTabs(notification: SwiftUI.Notification) {
         guard let target = notification.object as? Ghostty.SurfaceView else { return }
-        guard surfaceTree.contains(target) else { return }
+        guard surfaceTree.containsTerminal(target) else { return }
         closeOtherTabs(self)
     }
 
     @objc private func onCloseTabsOnTheRight(notification: SwiftUI.Notification) {
         guard let target = notification.object as? Ghostty.SurfaceView else { return }
-        guard surfaceTree.contains(target) else { return }
+        guard surfaceTree.containsTerminal(target) else { return }
         closeTabsOnTheRight(self)
     }
 
     @objc private func onCloseWindow(notification: SwiftUI.Notification) {
         guard let target = notification.object as? Ghostty.SurfaceView else { return }
-        guard surfaceTree.contains(target) else { return }
+        guard surfaceTree.containsTerminal(target) else { return }
         closeWindow(self)
     }
 
     @objc private func onResetWindowSize(notification: SwiftUI.Notification) {
         guard let target = notification.object as? Ghostty.SurfaceView else { return }
-        guard surfaceTree.contains(target) else { return }
+        guard surfaceTree.containsTerminal(target) else { return }
         returnToDefaultSize(nil)
     }
 

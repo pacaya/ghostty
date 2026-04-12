@@ -259,7 +259,7 @@ class QuickTerminalController: BaseTerminalController {
             return
         }
         // Check if target surface belongs to this quick terminal
-        guard surfaceTree.contains(view) else { return }
+        guard surfaceTree.containsTerminal(view) else { return }
         // Set the target surface as focused
         DispatchQueue.main.async {
             Ghostty.moveFocus(to: view)
@@ -268,7 +268,7 @@ class QuickTerminalController: BaseTerminalController {
         animateIn()
     }
 
-    override func surfaceTreeDidChange(from: SplitTree<Ghostty.SurfaceView>, to: SplitTree<Ghostty.SurfaceView>) {
+    override func surfaceTreeDidChange(from: SplitTree<PaneLeaf>, to: SplitTree<PaneLeaf>) {
         super.surfaceTreeDidChange(from: from, to: to)
 
         // If our surface tree is nil then we animate the window out. We
@@ -288,7 +288,7 @@ class QuickTerminalController: BaseTerminalController {
     }
 
     override func closeSurface(
-        _ node: SplitTree<Ghostty.SurfaceView>.Node,
+        _ node: SplitTree<PaneLeaf>.Node,
         withConfirmation: Bool = true
     ) {
         // If this isn't the root then we're dealing with a split closure.
@@ -298,14 +298,14 @@ class QuickTerminalController: BaseTerminalController {
         }
 
         // If this isn't a final leaf then we're dealing with a split closure
-        guard case .leaf(let surface) = node else {
+        guard case .leaf(let leaf) = node else {
             super.closeSurface(node, withConfirmation: withConfirmation)
             return
         }
 
         // If its the root, we check if the process exited. If it did,
         // then we do empty the tree.
-        if surface.processExited {
+        if leaf.terminal?.processExited == true {
             surfaceTree = .init()
             return
         }
@@ -357,15 +357,24 @@ class QuickTerminalController: BaseTerminalController {
            let ghostty_app = ghostty.app {
             if let tree = restorationState?.surfaceTree, !tree.isEmpty {
                 surfaceTree = tree
-                let view = tree.first(where: { $0.id.uuidString == restorationState?.focusedSurface }) ?? tree.first!
-                focusedSurface = view
-                // Add a short delay to check if the correct surface is focused.
-                // Each SurfaceWrapper defaults its FocusedValue to itself; without this delay,
-                // the tree often focuses the first surface instead of the intended one.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    if !view.focused {
-                        self.focusedSurface = view
-                        self.makeWindowKey(window)
+
+                let focusedID = restorationState?.focusedSurface
+                let focusedLeaf = tree.first(where: { leaf in
+                    guard let terminal = leaf.terminal else { return false }
+                    return terminal.id.uuidString == focusedID
+                })?.terminal
+                let view = focusedLeaf ?? tree.first(where: { $0.terminal != nil })?.terminal
+
+                if let view {
+                    focusedSurface = view
+                    // Add a short delay to check if the correct surface is focused.
+                    // Each SurfaceWrapper defaults its FocusedValue to itself; without this delay,
+                    // the tree often focuses the first surface instead of the intended one.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        if !view.focused {
+                            self.focusedSurface = view
+                            self.makeWindowKey(window)
+                        }
                     }
                 }
             } else {
@@ -373,7 +382,7 @@ class QuickTerminalController: BaseTerminalController {
                 config.environmentVariables["GHOSTTY_QUICK_TERMINAL"] = "1"
 
                 let view = Ghostty.SurfaceView(ghostty_app, baseConfig: config)
-                surfaceTree = SplitTree(view: view)
+                surfaceTree = SplitTree(view: PaneLeaf(terminal: view))
                 focusedSurface = view
             }
         }

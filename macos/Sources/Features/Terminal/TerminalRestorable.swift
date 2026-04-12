@@ -44,7 +44,7 @@ class TerminalRestorableState: TerminalRestorable {
     class var version: Int { 7 }
 
     let focusedSurface: String?
-    let surfaceTree: SplitTree<Ghostty.SurfaceView>
+    let surfaceTree: SplitTree<PaneLeaf>
     let effectiveFullscreenMode: FullscreenMode?
     let tabColor: TerminalTabColor
     let titleOverride: String?
@@ -147,9 +147,12 @@ class TerminalWindowRestoration: NSObject, NSWindowRestoration {
         // Find the focused surface in surfaceTree
         if let focusedStr = state.focusedSurface {
             var foundView: Ghostty.SurfaceView?
-            for view in c.surfaceTree where view.id.uuidString == focusedStr {
-                foundView = view
-                break
+            for leaf in c.surfaceTree {
+                guard let surface = leaf.terminal else { continue }
+                if surface.id.uuidString == focusedStr {
+                    foundView = surface
+                    break
+                }
             }
 
             if let view = foundView {

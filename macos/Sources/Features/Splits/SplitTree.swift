@@ -122,10 +122,19 @@ extension SplitTree {
 
     /// Insert a new view at the given view point by creating a split in the given direction.
     /// This will always reset the zoomed state of the tree.
-    func inserting(view: ViewType, at: ViewType, direction: NewDirection) throws -> Self {
+    func inserting(
+        view: ViewType,
+        at: ViewType,
+        direction: NewDirection,
+        newViewRatio: Double = 0.5
+    ) throws -> Self {
         guard let root else { throw SplitError.viewNotFound }
         return .init(
-            root: try root.inserting(view: view, at: at, direction: direction),
+            root: try root.inserting(
+                view: view,
+                at: at,
+                direction: direction,
+                newViewRatio: newViewRatio),
             zoomed: nil)
     }
     /// Find a node containing a view with the specified ID.
@@ -506,10 +515,18 @@ extension SplitTree.Node {
     ///   - view: The new view to insert into the tree
     ///   - at: The existing view at whose location the split should be created
     ///   - direction: The direction relative to the existing view where the new view should be placed
+    ///   - newViewRatio: Fraction of the new split occupied by `view`. Defaults
+    ///     to `0.5` (even split). Regardless of `direction`, the value refers to
+    ///     the space given to the inserted view, not the raw left/right ratio.
     ///
     /// - Note: If the existing view (`at`) is not found in the tree, this method does nothing. We should
     /// maybe throw instead but at the moment we just do nothing.
-    func inserting(view: ViewType, at: ViewType, direction: NewDirection) throws -> Self {
+    func inserting(
+        view: ViewType,
+        at: ViewType,
+        direction: NewDirection,
+        newViewRatio: Double = 0.5
+    ) throws -> Self {
         // Get the path to our insertion point. If it doesn't exist we do
         // nothing.
         guard let path = path(to: .leaf(view: at)) else {
@@ -534,12 +551,16 @@ extension SplitTree.Node {
             newViewOnLeft = false
         }
 
+        // Split.ratio is the fraction for the `left` child, so flip when the
+        // new view lands on the right.
+        let ratio = newViewOnLeft ? newViewRatio : (1.0 - newViewRatio)
+
         // Create the new split node
         let newNode: Node = .leaf(view: view)
         let existingNode: Node = .leaf(view: at)
         let newSplit: Node = .split(.init(
             direction: splitDirection,
-            ratio: 0.5,
+            ratio: ratio,
             left: newViewOnLeft ? newNode : existingNode,
             right: newViewOnLeft ? existingNode : newNode
         ))

@@ -210,6 +210,14 @@ extension Ghostty {
         var surface: ghostty_surface_t? {
             surfaceModel?.unsafeCValue
         }
+
+        /// The Zig-side u64 surface ID (matches child processes' $GHOSTTY_SURFACE_ID).
+        /// Returns 0 if the surface is not yet realized.
+        var zigId: UInt64 {
+            guard let surface else { return 0 }
+            return ghostty_surface_id(surface)
+        }
+
         /// Current scrollbar state, cached here for persistence across rebuilds
         /// of the SwiftUI view hierarchy, for example when changing splits
         var scrollbar: Ghostty.Action.Scrollbar?

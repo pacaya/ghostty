@@ -25,9 +25,9 @@ struct QuickTerminalIntent: AppIntent {
         c.animateIn()
 
         // Grab all our terminals
-        let terminals = c.surfaceTree.root?.leaves().map {
-            TerminalEntity($0)
-        } ?? []
+        let terminals = (c.surfaceTree.root?.leaves() ?? []).compactMap { leaf in
+            leaf.terminal.map { TerminalEntity($0) }
+        }
 
         return .result(value: terminals)
     }

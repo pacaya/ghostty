@@ -1174,12 +1174,13 @@ extension Ghostty {
                     guard let splitDirection = SplitFocusDirection.from(direction: direction) else { return false }
 
                     // Find the current node in the tree
-                    guard let targetNode = controller.surfaceTree.root?.node(view: surfaceView) else { return false }
+                    guard let targetLeaf = controller.surfaceTree.leaf(for: surfaceView),
+                          let targetNode = controller.surfaceTree.root?.node(view: targetLeaf) else { return false }
 
                     // Check if a split actually exists in the target direction before
                     // returning true. This ensures performable keybinds only consume
                     // the key event when we actually perform navigation.
-                    let focusDirection: SplitTree<Ghostty.SurfaceView>.FocusDirection = splitDirection.toSplitTreeFocusDirection()
+                    let focusDirection: SplitTree<PaneLeaf>.FocusDirection = splitDirection.toSplitTreeFocusDirection()
                     guard controller.surfaceTree.focusTarget(for: focusDirection, from: targetNode) != nil else {
                         return false
                     }
