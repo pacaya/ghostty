@@ -12,6 +12,8 @@ struct ProjectsSectionView: View {
     let headerHeight: CGFloat
     let dragState: ProjectsDragState
 
+    @State private var searchText: String = ""
+
     var body: some View {
         VStack(spacing: 0) {
             // Resizable divider (only when expanded)
@@ -27,19 +29,52 @@ struct ProjectsSectionView: View {
                 isExpanded: $isExpanded,
                 theme: theme,
                 onNewFolder: createFolder,
+                onNewProject: createProject,
                 onImport: importProject
             )
 
             // Expanded content
             if isExpanded {
+                // Search field
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.secondaryText)
+                    TextField("Filter projects...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.foreground)
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.secondaryText)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(theme.foreground.opacity(0.05))
+
                 ProjectsListView(
                     projectStore: projectStore,
                     tabManager: tabManager,
                     theme: theme,
-                    dragState: dragState
+                    dragState: dragState,
+                    searchFilter: searchText
                 )
             }
         }
+    }
+
+    private func createProject() {
+        if !isExpanded {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded = true
+            }
+        }
+        projectStore.createBlankProject(in: nil)
     }
 
     private func createFolder() {
@@ -79,6 +114,7 @@ struct ProjectsSectionHeader: View {
     @Binding var isExpanded: Bool
     var theme: SidebarTheme
     var onNewFolder: () -> Void
+    var onNewProject: () -> Void
     var onImport: () -> Void
 
     var body: some View {
@@ -95,6 +131,14 @@ struct ProjectsSectionHeader: View {
             Spacer()
 
             if isExpanded {
+                Button(action: onNewProject) {
+                    Image(systemName: "doc.badge.plus")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.secondaryText)
+                }
+                .buttonStyle(.plain)
+                .help("New Project")
+
                 Button(action: onNewFolder) {
                     Image(systemName: "folder.badge.plus")
                         .font(.system(size: 10))
@@ -128,6 +172,15 @@ struct ProjectsSectionHeader: View {
             }
 
             Divider()
+
+            Button("New Project") {
+                if !isExpanded {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded = true
+                    }
+                }
+                onNewProject()
+            }
 
             Button("New Folder") {
                 if !isExpanded {

@@ -11,6 +11,7 @@ struct ProjectsListView: View {
     @ObservedObject var tabManager: SidebarTabManager
     var theme: SidebarTheme
     let dragState: ProjectsDragState
+    var searchFilter: String = ""
 
     var body: some View {
         content
@@ -22,23 +23,62 @@ struct ProjectsListView: View {
             ))
     }
 
-    @ViewBuilder
-    private var content: some View {
-        if projectStore.projects.isEmpty && projectStore.folders.isEmpty {
-            // Empty state
-            VStack(spacing: 4) {
-                Spacer()
-                Text("No projects yet")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.secondaryText)
-                Text("Right-click a tab to save as project,\nor drag a tab here.")
+    private var trimmedFilter: String {
+        searchFilter.trimmingCharacters(in: .whitespaces)
+    }
+
+    private var isFiltering: Bool {
+        !trimmedFilter.isEmpty
+    }
+
+    private func emptyState(_ message: String, subtitle: String? = nil) -> some View {
+        VStack(spacing: 4) {
+            Spacer()
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundColor(theme.secondaryText)
+            if let subtitle {
+                Text(subtitle)
                     .font(.system(size: 10))
                     .foregroundColor(theme.secondaryText.opacity(0.7))
                     .multilineTextAlignment(.center)
-                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 8)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 8)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if projectStore.projects.isEmpty && projectStore.folders.isEmpty {
+            emptyState(
+                "No projects yet",
+                subtitle: "Right-click a tab to save as project,\nor drag a tab here."
+            )
+        } else if isFiltering {
+            let filtered = projectStore.projects.filter {
+                $0.name.localizedCaseInsensitiveContains(trimmedFilter)
+            }
+            if filtered.isEmpty {
+                emptyState("No matching projects")
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(filtered) { project in
+                            SidebarProjectCard(
+                                project: project,
+                                projectStore: projectStore,
+                                tabManager: tabManager,
+                                theme: theme,
+                                depth: 0
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
+                }
+            }
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
