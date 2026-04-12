@@ -35,7 +35,7 @@ final class BrowserPaneCloseMessageHandler: NSObject, WKScriptMessageHandler {
     ) {
         guard let webView = message.webView,
               let controller = webView.window?.windowController as? BaseTerminalController,
-              let container = webView.enclosingPaneLeaf()?.browser,
+              let container = webView.enclosingBrowserContainer(),
               let node = controller.surfaceTree.root?.find(id: container.id)
         else { return }
         controller.closeSurface(node, withConfirmation: false)

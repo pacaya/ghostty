@@ -161,4 +161,16 @@ extension NSView {
         }
         return nil
     }
+
+    /// Walk up the view hierarchy to find the enclosing `BrowserPaneContainer`.
+    /// Unlike `enclosingPaneLeaf()`, this works even when SwiftUI has
+    /// re-parented the container out of PaneLeaf (via `NSViewRepresentable`).
+    func enclosingBrowserContainer() -> BrowserPaneContainer? {
+        var v: NSView? = self
+        while let cur = v {
+            if let c = cur as? BrowserPaneContainer { return c }
+            v = cur.superview
+        }
+        return nil
+    }
 }

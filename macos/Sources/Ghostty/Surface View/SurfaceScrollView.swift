@@ -56,6 +56,12 @@ class SurfaceScrollView: NSView {
         // so that our primary Ghostty renderer only needs to render the viewport.
         documentView.addSubview(surfaceView)
 
+        // Reset autoresizingMask: PaneLeaf.attachChild sets [.width, .height]
+        // on the surface view, but the document view's height represents total
+        // scrollback and can be very large. We manage the surface frame
+        // explicitly in layout().
+        surfaceView.autoresizingMask = []
+
         super.init(frame: .zero)
 
         // Our scroll view is our only view
