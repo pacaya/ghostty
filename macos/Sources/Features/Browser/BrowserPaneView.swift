@@ -139,10 +139,7 @@ class BrowserPaneView: NSView, ObservableObject, Identifiable {
     override var acceptsFirstResponder: Bool { true }
 
     override func becomeFirstResponder() -> Bool {
-        if let leaf = enclosingPaneLeaf(),
-           let controller = window?.windowController as? BaseTerminalController {
-            controller.noteFirstResponderEnteredLeaf(leaf)
-        }
+        enclosingBrowserContainer()?.notifyControllerOfFocus()
         return window?.makeFirstResponder(webView) ?? false
     }
 

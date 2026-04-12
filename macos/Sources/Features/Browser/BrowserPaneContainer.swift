@@ -87,15 +87,22 @@ class BrowserPaneContainer: NSView, Codable, Identifiable {
         window?.makeFirstResponder(chromeHost)
     }
 
+    /// Resolve the `PaneLeaf` for this container via the split tree and
+    /// notify the controller that focus entered it.  Shared by all browser
+    /// views that override `becomeFirstResponder`.
+    func notifyControllerOfFocus() {
+        guard let controller = window?.windowController as? BaseTerminalController,
+              case .leaf(let leaf) = controller.surfaceTree.root?.find(id: self.id)
+        else { return }
+        controller.noteFirstResponderEnteredLeaf(leaf)
+    }
+
     // MARK: - Responder chain
 
     override var acceptsFirstResponder: Bool { true }
 
     override func becomeFirstResponder() -> Bool {
-        if let leaf = enclosingPaneLeaf(),
-           let controller = window?.windowController as? BaseTerminalController {
-            controller.noteFirstResponderEnteredLeaf(leaf)
-        }
+        notifyControllerOfFocus()
         // If the omnibar is focused, leave focus with the chrome; otherwise
         // forward to the web view so typing goes into the page.
         if chromeModel.addressBarFocused {

@@ -20,10 +20,7 @@ import WebKit
 ///    know which leaf kind is focused.
 final class BrowserWKWebView: WKWebView {
     override func becomeFirstResponder() -> Bool {
-        if let leaf = enclosingPaneLeaf(),
-           let controller = window?.windowController as? BaseTerminalController {
-            controller.noteFirstResponderEnteredLeaf(leaf)
-        }
+        enclosingBrowserContainer()?.notifyControllerOfFocus()
         return super.becomeFirstResponder()
     }
 

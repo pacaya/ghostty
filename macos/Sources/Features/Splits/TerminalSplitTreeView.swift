@@ -269,5 +269,7 @@ private struct BrowserPaneHost: NSViewRepresentable {
         container
     }
 
-    func updateNSView(_ nsView: BrowserPaneContainer, context: Context) {}
+    func updateNSView(_ nsView: BrowserPaneContainer, context: Context) {
+        nsView.needsLayout = true
+    }
 }
