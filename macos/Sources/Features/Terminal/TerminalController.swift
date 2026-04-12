@@ -46,6 +46,11 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     /// changes in the list.
     private var tabWindowsHash: Int = 0
 
+    /// The initial window presentation is deferred by one runloop turn in a few places so
+    /// AppKit can settle tab/window state first. Close actions must cancel it to avoid
+    /// re-showing a tab that was already closed.
+    private var pendingInitialPresentation: DispatchWorkItem?
+
     /// This is set to false by init if the window managed by this controller should not be restorable.
     /// For example, terminals executing custom scripts are not restorable.
     private var restorable: Bool = true
@@ -148,6 +153,27 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // Remove all of our notificationcenter subscriptions
         let center = NotificationCenter.default
         center.removeObserver(self)
+    }
+
+    private func cancelPendingInitialPresentation() {
+        pendingInitialPresentation?.cancel()
+        pendingInitialPresentation = nil
+    }
+
+    private func scheduleInitialPresentation(_ block: @escaping () -> Void) {
+        cancelPendingInitialPresentation()
+
+        var scheduledWorkItem: DispatchWorkItem?
+        scheduledWorkItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            defer { self.pendingInitialPresentation = nil }
+            guard scheduledWorkItem?.isCancelled == false else { return }
+            block()
+        }
+
+        let workItem = scheduledWorkItem!
+        pendingInitialPresentation = workItem
+        DispatchQueue.main.async(execute: workItem)
     }
 
     // MARK: Base Controller Overrides
@@ -267,7 +293,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // We're dispatching this async because otherwise the lastCascadePoint doesn't
         // take effect. Our best theory is there is some next-event-loop-tick logic
         // that Cocoa is doing that we need to be after.
-        DispatchQueue.main.async {
+        c.scheduleInitialPresentation {
             c.showWindow(self)
 
             // Only cascade if we aren't fullscreen.
@@ -329,7 +355,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // Calculate the target frame based on the tree's view bounds
         let treeSize: CGSize? = tree.root?.viewBounds()
 
-        DispatchQueue.main.async {
+        c.scheduleInitialPresentation {
             c.showWindow(self)
             if let window = c.window {
                 // If we have a tree size, resize the window's content to match
@@ -444,7 +470,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // We're dispatching this async because otherwise the lastCascadePoint doesn't
         // take effect. Our best theory is there is some next-event-loop-tick logic
         // that Cocoa is doing that we need to be after.
-        DispatchQueue.main.async {
+        controller.scheduleInitialPresentation {
             // Only cascade if we aren't fullscreen and are alone in the tab group.
             if !window.styleMask.contains(.fullScreen) &&
                 window.tabGroup?.windows.count ?? 1 == 1 {
@@ -688,6 +714,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             return
         }
 
+        cancelPendingInitialPresentation()
+
         // Undo
         if let undoManager, let undoState {
             // Register undo action to restore the tab
@@ -806,6 +834,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     func closeWindowImmediately() {
         guard let window = window else { return }
 
+        cancelPendingInitialPresentation()
+
         registerUndoForCloseWindow()
 
         if let tabGroup = window.tabGroup, tabGroup.windows.count > 1 {
@@ -814,6 +844,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
                 // This prevents unnecessary undos registered since AppKit may
                 // process them on later ticks so we can't just disable undo registration.
                 if let controller = window.windowController as? TerminalController {
+                    controller.cancelPendingInitialPresentation()
                     controller.surfaceTree = .init()
                 }
 
@@ -1243,6 +1274,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     override func windowWillClose(_ notification: Notification) {
         super.windowWillClose(notification)
+        cancelPendingInitialPresentation()
         self.relabelTabs()
 
         // If we remove a window, we reset the cascade point to the key window so that

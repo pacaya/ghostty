@@ -73,99 +73,7 @@ struct SidebarView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
-                    SidebarTabCard(tab: tab, theme: theme, fields: fields, projectStore: projectStore, showCardBorder: showCardBorder, dimInactive: dimInactiveColors)
-                        .contentShape(Rectangle())
-                        .opacity(dragState.draggingItem == .tab(tab.id) ? 0.4 : 1.0)
-                        .overlay(alignment: .top) {
-                            if dragState.dropTargetTabID == tab.id && dragState.draggingItem != .tab(tab.id) {
-                                Rectangle()
-                                    .fill(Color.accentColor)
-                                    .frame(height: 2)
-                                    .offset(y: -3)
-                            }
-                        }
-                        .onTapGesture {
-                            dragState.reset()
-                            tabManager.selectTab(tab)
-                        }
-                        .onDrag {
-                            dragState.beginTabDrag(tab.id)
-                            return SidebarDropPayload.tab(index).itemProvider()
-                        }
-                        .onDrop(of: [.ghosttySidebarItem], delegate: TabDropDelegate(
-                            tabManager: tabManager,
-                            currentTab: tab,
-                            currentIndex: index,
-                            dragState: dragState
-                        ))
-                        .contextMenu {
-                            Button("Rename Tab...") {
-                                tabManager.promptRenameTab(tab)
-                            }
-
-                            Divider()
-
-                            Menu("Tab Color") {
-                                ForEach(TerminalTabColor.allCases, id: \.self) { color in
-                                    Button {
-                                        tabManager.setTabColor(color, for: tab)
-                                    } label: {
-                                        Label {
-                                            Text(color.localizedName)
-                                        } icon: {
-                                            Image(nsImage: color.swatchImage(selected: color == tab.tabColor))
-                                        }
-                                    }
-                                }
-                            }
-
-                            Toggle("Show Tab Border", isOn: $showCardBorder)
-                            Toggle("Dim Inactive Tab Colors", isOn: $dimInactiveColors)
-
-                            Divider()
-
-                            let associatedProjectId = projectStore.projectId(for: tab.window)
-
-                            if let projectId = associatedProjectId {
-                                Button("Close Tab") {
-                                    if let controller = tab.window.windowController as? BaseTerminalController {
-                                        _ = projectStore.snapshotFromTab(
-                                            controller: controller,
-                                            existingProjectId: projectId
-                                        )
-                                    }
-                                    projectStore.disassociate(window: tab.window)
-                                    tabManager.closeTab(tab)
-                                }
-                            } else {
-                                Button("Save to Projects") {
-                                    if let controller = tab.window.windowController as? BaseTerminalController,
-                                       let project = projectStore.snapshotFromTab(controller: controller) {
-                                        projectStore.associate(window: tab.window, with: project.id)
-                                    }
-                                }
-                            }
-
-                            Button("Delete Tab") {
-                                if associatedProjectId != nil {
-                                    projectStore.disassociate(window: tab.window)
-                                }
-                                tabManager.closeTab(tab)
-                            }
-
-                            Button("Close Other Tabs") {
-                                tabManager.closeOtherTabs(tab)
-                            }
-                            .disabled(tabManager.tabs.count <= 1)
-
-                            Button("Close Tabs to the Right") {
-                                tabManager.closeTabsToTheRight(of: tab)
-                            }
-                            .disabled({
-                                guard let idx = tabManager.tabs.firstIndex(where: { $0.id == tab.id }) else { return true }
-                                return idx >= tabManager.tabs.count - 1
-                            }())
-                        }
+                    tabRow(tab, index: index)
                 }
             }
             .padding(.horizontal, 8)
@@ -173,6 +81,107 @@ struct SidebarView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.background)
+    }
+
+    @ViewBuilder
+    private func tabRow(_ tab: SidebarTabManager.TabItem, index: Int) -> some View {
+        SidebarTabCard(tab: tab, theme: theme, fields: fields, projectStore: projectStore, tabManager: tabManager, dragState: dragState, showCardBorder: showCardBorder, dimInactive: dimInactiveColors)
+            .contentShape(Rectangle())
+            .opacity(dragState.draggingItem == .tab(tab.id) ? 0.4 : 1.0)
+            .overlay(alignment: .top) {
+                if dragState.dropTargetTabID == tab.id && dragState.draggingItem != .tab(tab.id) {
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(height: 2)
+                        .offset(y: -3)
+                }
+            }
+            .onTapGesture {
+                dragState.reset()
+                tabManager.selectTab(tab)
+            }
+            .onDrag {
+                dragState.beginTabDrag(tab.id)
+                return SidebarDropPayload.tab(index).itemProvider()
+            }
+            .onDrop(of: [.ghosttySidebarItem], delegate: TabDropDelegate(
+                tabManager: tabManager,
+                currentTab: tab,
+                currentIndex: index,
+                dragState: dragState
+            ))
+            .contextMenu {
+                Button("Rename Tab...") {
+                    tabManager.promptRenameTab(tab)
+                }
+
+                Divider()
+
+                Menu("Tab Color") {
+                    ForEach(TerminalTabColor.allCases, id: \.self) { color in
+                        Button {
+                            tabManager.setTabColor(color, for: tab)
+                        } label: {
+                            Label {
+                                Text(color.localizedName)
+                            } icon: {
+                                Image(nsImage: color.swatchImage(selected: color == tab.tabColor))
+                            }
+                        }
+                    }
+                }
+
+                Toggle("Show Tab Border", isOn: $showCardBorder)
+                Toggle("Dim Inactive Tab Colors", isOn: $dimInactiveColors)
+
+                Divider()
+
+                if projectStore.projectId(for: tab.window) != nil {
+                    Button("Close Tab") {
+                        closeTab(tab)
+                    }
+                } else {
+                    Button("Save to Projects") {
+                        if let controller = tab.window.windowController as? BaseTerminalController,
+                           let project = projectStore.snapshotFromTab(controller: controller) {
+                            projectStore.associate(window: tab.window, with: project.id)
+                        }
+                    }
+                }
+
+                Button("Delete Tab") {
+                    if projectStore.projectId(for: tab.window) != nil {
+                        projectStore.disassociate(window: tab.window)
+                    }
+                    tabManager.closeTab(tab)
+                }
+
+                Button("Close Other Tabs") {
+                    tabManager.closeOtherTabs(tab)
+                }
+                .disabled(tabManager.tabs.count <= 1)
+
+                Button("Close Tabs to the Right") {
+                    tabManager.closeTabsToTheRight(of: tab)
+                }
+                .disabled({
+                    guard let idx = tabManager.tabs.firstIndex(where: { $0.id == tab.id }) else { return true }
+                    return idx >= tabManager.tabs.count - 1
+                }())
+            }
+    }
+
+    private func closeTab(_ tab: SidebarTabManager.TabItem) {
+        if let projectId = projectStore.projectId(for: tab.window) {
+            if let controller = tab.window.windowController as? BaseTerminalController {
+                _ = projectStore.snapshotFromTab(
+                    controller: controller,
+                    existingProjectId: projectId
+                )
+            }
+            projectStore.disassociate(window: tab.window)
+        }
+        tabManager.closeTab(tab)
     }
 }
 
@@ -223,8 +232,12 @@ private struct SidebarTabCard: View {
     let theme: SidebarTheme
     let fields: Set<SidebarField>
     @ObservedObject var projectStore: ProjectStore
+    let tabManager: SidebarTabManager
+    let dragState: ProjectsDragState
     var showCardBorder: Bool = true
     var dimInactive: Bool = false
+
+    @State private var isHovered: Bool = false
 
     private static let cardRadius: CGFloat = 8
 
@@ -269,22 +282,33 @@ private struct SidebarTabCard: View {
 
                         Spacer()
 
-                        if projectStore.projectId(for: tab.window) != nil {
-                            Image(systemName: "bookmark.fill")
-                                .font(.system(size: 9))
-                                .foregroundColor(theme.secondaryText)
-                        }
+                        if isHovered && dragState.draggingItem == nil {
+                            let isSaved = projectStore.projectId(for: tab.window) != nil
+                            Button(action: closeTab) {
+                                Image(systemName: isSaved ? "xmark" : "trash")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(theme.secondaryText)
+                            }
+                            .buttonStyle(.plain)
+                            .help(isSaved ? "Close Tab" : "Delete Tab")
+                        } else {
+                            if projectStore.projectId(for: tab.window) == nil {
+                                Image(systemName: "circle.dashed")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(theme.secondaryText.opacity(0.5))
+                            }
 
-                        if tab.hasRunningProcess {
-                            Image(systemName: "terminal")
-                                .font(.system(size: 9))
-                                .foregroundColor(theme.attentionColor)
-                        }
+                            if tab.hasRunningProcess {
+                                Image(systemName: "terminal")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(theme.attentionColor)
+                            }
 
-                        if tab.needsAttention {
-                            Circle()
-                                .fill(theme.attentionColor)
-                                .frame(width: 8, height: 8)
+                            if tab.needsAttention {
+                                Circle()
+                                    .fill(theme.attentionColor)
+                                    .frame(width: 8, height: 8)
+                            }
                         }
                     }
                 }
@@ -349,5 +373,22 @@ private struct SidebarTabCard: View {
                 }
             }
         )
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+    }
+
+    private func closeTab() {
+        if let projectId = projectStore.projectId(for: tab.window) {
+            if let controller = tab.window.windowController as? BaseTerminalController {
+                _ = projectStore.snapshotFromTab(
+                    controller: controller,
+                    existingProjectId: projectId
+                )
+            }
+            projectStore.disassociate(window: tab.window)
+        }
+        tabManager.closeTab(tab)
     }
 }
