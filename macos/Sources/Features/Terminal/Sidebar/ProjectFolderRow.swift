@@ -65,6 +65,15 @@ struct ProjectFolderRow: View {
                     isRenaming = true
                 }
 
+                Button("New Project") {
+                    projectStore.createBlankProject(in: folder.id)
+                    if !folder.isExpanded {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            projectStore.setFolderExpanded(folder.id, true)
+                        }
+                    }
+                }
+
                 Button("New Subfolder") {
                     let subfolder = ProjectFolder(
                         id: UUID(),
@@ -74,7 +83,7 @@ struct ProjectFolderRow: View {
                     )
                     projectStore.addFolder(subfolder)
                     if !folder.isExpanded {
-                        withAnimation(.easeInOut(duration: 0.15)) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
                             projectStore.setFolderExpanded(folder.id, true)
                         }
                     }

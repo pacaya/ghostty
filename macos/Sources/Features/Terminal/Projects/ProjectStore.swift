@@ -105,6 +105,22 @@ final class ProjectStore: ObservableObject {
         isDirty = true
     }
 
+    @discardableResult
+    func createBlankProject(in folderId: UUID?) -> Project {
+        let layout = ProjectLayoutNode.leaf(.init(workingDirectory: "~"))
+        let project = Project(
+            id: UUID(),
+            name: uniqueName(for: "New Project", in: folderId),
+            color: .none,
+            layoutRoot: layout,
+            lastModified: Date(),
+            folderId: folderId,
+            sortOrder: nextSortOrder(in: folderId)
+        )
+        addProject(project)
+        return project
+    }
+
     func duplicateProject(_ project: Project) -> Project {
         let copy = Project(
             id: UUID(),
