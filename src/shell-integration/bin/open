@@ -1,5 +1,5 @@
 #!/bin/sh
-# ghostty-open-shim.sh
+# open
 #
 # Purpose:
 #   A thin `open(1)` replacement that redirects http(s) URLs into a Ghostty
@@ -9,11 +9,15 @@
 #
 # Activation:
 #   This script is bundled inside the Ghostty.app resources at
-#   $GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh and
-#   is invoked automatically by an `open` shell function defined in Ghostty's
-#   zsh/bash/fish shell integration scripts. No manual setup or symlinking is
-#   required — opening a new Ghostty terminal with shell integration enabled
-#   is sufficient on macOS.
+#   $GHOSTTY_RESOURCES_DIR/shell-integration/bin/open. Ghostty prepends that
+#   directory to PATH for every process it spawns inside a surface, so
+#   ordinary execvp("open", …) resolves here first — shadowing /usr/bin/open.
+#   This means child processes (Node CLIs, Python tools, TUIs with a "view in
+#   browser" action, etc.) are intercepted exactly the same way as interactive
+#   shell invocations. No manual setup or symlinking is required — opening a
+#   new Ghostty terminal with shell integration enabled is sufficient on
+#   macOS. Users who set `shell-integration = none` opt out: the PATH prepend
+#   is skipped and the system `/usr/bin/open` is used unchanged.
 #
 # Transport:
 #   The shim talks directly to Ghostty's IPC server (GhosttyIPCServer), a

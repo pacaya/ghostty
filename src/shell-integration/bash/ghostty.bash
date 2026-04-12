@@ -86,6 +86,45 @@ if [[ "$GHOSTTY_SHELL_FEATURES" == *"path"* && -n "$GHOSTTY_BIN_DIR" ]]; then
   fi
 fi
 
+# On macOS, force the shell-integration/bin directory to the front of PATH
+# so its `open` shim wins over /usr/bin/open. Ghostty prepends it in
+# Exec.zig, but `/etc/profile` runs `path_helper -s`, which rewrites PATH
+# from scratch: it preserves the shim entry but moves it behind /usr/bin,
+# so a plain "if not present, prepend" check silently no-ops. We run after
+# rc files, so unconditionally remove any existing occurrences and
+# re-prepend, guaranteeing the shim is found first by children we execvp
+# (node CLIs, python tools, etc.).
+#
+# We also define an `open` shell function that calls the shim by absolute
+# path. Functions beat both PATH lookups and bash's command hash table, so
+# interactive `open URL` keeps working even if something in /etc/profile or
+# bashrc probed `open` (via `command -v`, `type`, etc.) and cached its path
+# to /usr/bin/open before our re-prepend ran.
+if [[ "$OSTYPE" == darwin* && -n "$GHOSTTY_RESOURCES_DIR" ]]; then
+  __ghostty_shim_bin="$GHOSTTY_RESOURCES_DIR/shell-integration/bin"
+  if [[ -d "$__ghostty_shim_bin" ]]; then
+    # Strip every existing occurrence of the shim dir from PATH, then
+    # prepend. The leading/trailing `:` wrapping lets us match entries at
+    # the head, tail, and middle with a single replacement.
+    __ghostty_path_wrapped=":$PATH:"
+    __ghostty_path_wrapped="${__ghostty_path_wrapped//:$__ghostty_shim_bin:/:}"
+    __ghostty_path_wrapped="${__ghostty_path_wrapped#:}"
+    __ghostty_path_wrapped="${__ghostty_path_wrapped%:}"
+    if [[ -n "$__ghostty_path_wrapped" ]]; then
+      export PATH="$__ghostty_shim_bin:$__ghostty_path_wrapped"
+    else
+      export PATH="$__ghostty_shim_bin"
+    fi
+    unset __ghostty_path_wrapped
+  fi
+  if [[ -x "$__ghostty_shim_bin/open" ]]; then
+    function open() {
+      "$GHOSTTY_RESOURCES_DIR/shell-integration/bin/open" "$@"
+    }
+  fi
+  unset __ghostty_shim_bin
+fi
+
 # Sudo
 if [[ "$GHOSTTY_SHELL_FEATURES" == *"sudo"* && -n "$TERMINFO" ]]; then
   # Wrap `sudo` command to ensure Ghostty terminfo is preserved.
@@ -180,15 +219,6 @@ if [[ "$GHOSTTY_SHELL_FEATURES" == *ssh-* ]]; then
 
     # Execute SSH with TERM environment variable
     TERM="$ssh_term" COLORTERM=truecolor builtin command ssh "${ssh_opts[@]}" "$@"
-  }
-fi
-
-# Route `open <http(s) URL>` to a Ghostty browser pane (macOS only).
-# The shim handles URL detection, flag passthrough (`-a`, `-g`, …),
-# and graceful fallback to /usr/bin/open for non-URL or IPC failure cases.
-if [[ "$OSTYPE" == darwin* ]] && [[ -x "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh" ]]; then
-  function open() {
-    "$GHOSTTY_RESOURCES_DIR/shell-integration/helpers/ghostty-open-shim.sh" "$@"
   }
 fi
 
