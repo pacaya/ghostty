@@ -7,6 +7,9 @@ enum BrowserCommands {
     /// explicit destination (menu items, keybindings).
     static let defaultURL = URL(string: "about:blank")!
 
+    /// Fraction of a new split given to a browser pane. Terminal splits use the default 0.5.
+    static let newSplitRatio: Double = 0.8
+
     /// Core browser-split spawn helper. Browser panes live entirely inside
     /// the Swift apprt — this never touches libghostty. Callers pass an
     /// explicit `anchor` leaf so IPC-originated spawns don't race against
@@ -31,7 +34,8 @@ enum BrowserCommands {
             newTree = try sourceController.surfaceTree.inserting(
                 view: newLeaf,
                 at: anchor,
-                direction: direction)
+                direction: direction,
+                newViewRatio: BrowserCommands.newSplitRatio)
         } catch {
             return nil
         }

@@ -39,6 +39,7 @@ class BrowserPaneView: NSView, ObservableObject, Identifiable {
         self.id = id
 
         let configuration = WKWebViewConfiguration()
+        configuration.userContentController = Self.makeUserContentController()
         self.webView = BrowserWKWebView(frame: .zero, configuration: configuration)
 
         // Safari user agent so sites that sniff UA behave sensibly.
@@ -71,6 +72,13 @@ class BrowserPaneView: NSView, ObservableObject, Identifiable {
     }
 
     // MARK: - Setup
+
+    private static func makeUserContentController() -> WKUserContentController {
+        let controller = WKUserContentController()
+        controller.add(BrowserPaneCloseMessageHandler.shared, name: BrowserPaneCloseMessageHandler.name)
+        controller.addUserScript(BrowserPaneCloseMessageHandler.userScript)
+        return controller
+    }
 
     private func setupWebView() {
         webView.translatesAutoresizingMaskIntoConstraints = false
