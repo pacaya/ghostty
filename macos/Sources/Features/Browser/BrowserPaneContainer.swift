@@ -112,6 +112,22 @@ class BrowserPaneContainer: NSView, Codable, Identifiable {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.type == .keyDown else { return super.performKeyEquivalent(with: event) }
+
+        // When the web view has focus (omnibar inactive), standard editing
+        // shortcuts must bypass the chrome's NSHostingView, which silently
+        // consumes Cmd+C/V/X/A/Z even when its SwiftUI TextField is not
+        // focused. Forward directly to the browser pane instead.
+        if !chromeModel.addressBarFocused {
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags == .command || flags == [.command, .shift] {
+                if let chars = event.charactersIgnoringModifiers?.lowercased(),
+                   ["c", "v", "x", "a", "z"].contains(chars) {
+                    return browserPane.performKeyEquivalent(with: event)
+                }
+            }
+        }
+
         // Let Ghostty's key bindings claim the event before the web view.
         return super.performKeyEquivalent(with: event)
     }
