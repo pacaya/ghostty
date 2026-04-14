@@ -20,15 +20,11 @@
 #
 # Enables integration between zsh and ghostty.
 #
-# This is an autoloadable function. It's invoked automatically in shells
-# directly spawned by Ghostty but not in any other shells. For example, running
-# `exec zsh`, `sudo -E zsh`, `tmux`, or plain `zsh` will create a shell where
-# ghostty-integration won't automatically run. Zsh users who want integration with
-# Ghostty in all shells should add the following lines to their .zshrc:
-#
-#   if [[ -n $GHOSTTY_RESOURCES_DIR ]]; then
-#     source "$GHOSTTY_RESOURCES_DIR"/shell-integration/zsh/ghostty-integration
-#   fi
+# This is an autoloadable function. It's invoked automatically from our
+# sibling `.zshenv` in every zsh that inherits our ZDOTDIR — including
+# the shell Ghostty directly spawns, tmux panes, subshells, `exec zsh`,
+# `sudo -E zsh`, and `zsh -c '…'`. Shells with `--no-rcs` (e.g. `zsh -f`)
+# or that have explicitly overridden ZDOTDIR opt out by design.
 #
 # Implementation note: We can assume that alias expansion is disabled in this
 # file, so no need to quote defensively. We still have to defensively prefix all

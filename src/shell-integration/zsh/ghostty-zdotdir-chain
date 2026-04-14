@@ -1,0 +1,26 @@
+# Sourced by .zshrc / .zprofile / .zlogin / .zlogout siblings to chain-source
+# the user's corresponding startup file from their original ZDOTDIR.
+#
+# Ghostty keeps ZDOTDIR pointed at our integration dir for the lifetime of
+# the shell (see .zshenv) so every descendant zsh re-runs ghostty-integration.
+# Wrappers call:
+#
+#     'builtin' 'source' '--' "${${(%):-%x}:A:h}/ghostty-zdotdir-chain" .zshrc
+#
+# …and this file: (1) temporarily restores the user's ZDOTDIR so their rc sees
+# expected state, (2) sources the user's $ZDOTDIR/$1 if readable, (3) restores
+# our ZDOTDIR so the next $ZDOTDIR/.zXXX lookup still lands in our dir.
+
+{
+    'builtin' 'typeset' _ghostty_chain_target="$1"
+    if [[ -n "${GHOSTTY_ZSH_ZDOTDIR+X}" ]]; then
+        'builtin' 'export' ZDOTDIR="$GHOSTTY_ZSH_ZDOTDIR"
+    else
+        'builtin' 'unset' 'ZDOTDIR'
+    fi
+    'builtin' 'typeset' _ghostty_chain_file="${ZDOTDIR-$HOME}/$_ghostty_chain_target"
+    [[ ! -r "$_ghostty_chain_file" ]] || 'builtin' 'source' '--' "$_ghostty_chain_file"
+} always {
+    'builtin' 'export' ZDOTDIR="${${(%):-%x}:A:h}"
+    'builtin' 'unset' '_ghostty_chain_target' '_ghostty_chain_file'
+}
