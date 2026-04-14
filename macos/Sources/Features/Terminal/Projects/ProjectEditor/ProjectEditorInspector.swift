@@ -49,11 +49,6 @@ struct ProjectEditorInspector: View {
         )
         let command = stringBinding(
             path: path,
-            get: { $0.command ?? "" },
-            set: { $0.command = $1.isEmpty ? nil : $1 }
-        )
-        let initialInput = stringBinding(
-            path: path,
             get: { $0.initialInput ?? "" },
             set: { $0.initialInput = $1.isEmpty ? nil : $1 }
         )
@@ -67,18 +62,13 @@ struct ProjectEditorInspector: View {
             }
         }
 
-        LabeledContent("Command") {
-            TextField("", text: command)
-                .textFieldStyle(.roundedBorder)
-        }
-
         VStack(alignment: .leading, spacing: 4) {
-            LabeledContent("Initial Input") {
-                TextField("", text: initialInput, axis: .vertical)
-                    .lineLimit(3...)
+            LabeledContent("Command") {
+                TextField("", text: command, axis: .vertical)
+                    .lineLimit(1...)
                     .textFieldStyle(.roundedBorder)
             }
-            Text("Use \\n for newlines. Sent to the terminal after launch.")
+            Text("Runs after the shell loads. A trailing newline is added if missing.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

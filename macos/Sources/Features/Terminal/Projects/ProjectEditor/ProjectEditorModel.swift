@@ -150,13 +150,11 @@ final class ProjectEditorModel: ObservableObject {
         }
     }
 
-    /// Collapses empty strings in `command`/`initialInput` to `nil` and
-    /// drops empty-keyed entries from `environmentVariables` across every
-    /// leaf in the tree.
+    /// Collapses an empty `initialInput` to `nil` and drops empty-keyed
+    /// entries from `environmentVariables` across every leaf in the tree.
     private static func normalize(_ node: ProjectLayoutNode) -> ProjectLayoutNode {
         switch node {
         case .leaf(let leaf):
-            let command = leaf.command?.isEmpty == true ? nil : leaf.command
             let initialInput = leaf.initialInput?.isEmpty == true ? nil : leaf.initialInput
             let env = leaf.environmentVariables.filter { !$0.key.isEmpty }
             let normalized = ProjectLeaf(
@@ -164,7 +162,6 @@ final class ProjectEditorModel: ObservableObject {
                 kind: leaf.kind,
                 url: leaf.url,
                 id: leaf.id,
-                command: command,
                 initialInput: initialInput,
                 environmentVariables: env
             )

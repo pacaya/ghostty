@@ -29,11 +29,9 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
         /// URL for a browser leaf. `nil` for terminal leaves.
         var url: String?
 
-        /// Optional command override for a terminal leaf. `nil` means inherit
-        /// from the app config (libghostty's "unset → inherit" contract).
-        var command: String?
-
-        /// Optional initial input piped into the terminal on launch.
+        /// Optional command to run after the shell loads. Sent as raw input
+        /// to the PTY; a trailing newline is appended at launch time so the
+        /// user's shell executes it.
         var initialInput: String?
 
         /// Environment variables merged into the terminal's launch environment.
@@ -45,7 +43,6 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
             kind: ProjectLeafKind = .terminal,
             url: String? = nil,
             id: UUID = UUID(),
-            command: String? = nil,
             initialInput: String? = nil,
             environmentVariables: [String: String] = [:]
         ) {
@@ -53,7 +50,6 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
             self.kind = kind
             self.url = url
             self.id = id
-            self.command = command
             self.initialInput = initialInput
             self.environmentVariables = environmentVariables
         }
@@ -74,8 +70,9 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
             workingDirectory = try container.decodeIfPresent(String.self, forKey: .workingDirectory) ?? "~"
             kind = try container.decodeIfPresent(ProjectLeafKind.self, forKey: .kind) ?? .terminal
             url = try container.decodeIfPresent(String.self, forKey: .url)
-            command = try container.decodeIfPresent(String.self, forKey: .command)
-            initialInput = try container.decodeIfPresent(String.self, forKey: .initialInput)
+            // Migrate older snapshots that persisted this text under "command".
+            let legacyCommand = try container.decodeIfPresent(String.self, forKey: .command)
+            initialInput = try container.decodeIfPresent(String.self, forKey: .initialInput) ?? legacyCommand
             environmentVariables = try container.decodeIfPresent(
                 [String: String].self, forKey: .environmentVariables) ?? [:]
         }
@@ -89,9 +86,6 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
             // matches libghostty's "unset → inherit" contract.
             if let url, !url.isEmpty {
                 try container.encode(url, forKey: .url)
-            }
-            if let command, !command.isEmpty {
-                try container.encode(command, forKey: .command)
             }
             if let initialInput, !initialInput.isEmpty {
                 try container.encode(initialInput, forKey: .initialInput)
@@ -183,7 +177,6 @@ extension ProjectLayoutNode {
                 kind: leaf.kind,
                 url: leaf.url,
                 id: UUID(),
-                command: leaf.command,
                 initialInput: leaf.initialInput,
                 environmentVariables: leaf.environmentVariables
             ))
@@ -197,11 +190,11 @@ extension ProjectLayoutNode {
         }
     }
 
-    /// Return a copy with `command`, `initialInput`, and `environmentVariables`
-    /// cleared from every leaf. Used on import: those fields drive process
-    /// launch and environment, so a shared project file would otherwise be a
-    /// code-execution surface. Users can re-add them explicitly via the
-    /// project editor if they trust the source.
+    /// Return a copy with `initialInput` and `environmentVariables` cleared
+    /// from every leaf. Used on import: those fields drive what the shell
+    /// runs and the environment it runs in, so a shared project file would
+    /// otherwise be a code-execution surface. Users can re-add them
+    /// explicitly via the project editor if they trust the source.
     func strippingExecutableFields() -> ProjectLayoutNode {
         switch self {
         case .leaf(let leaf):

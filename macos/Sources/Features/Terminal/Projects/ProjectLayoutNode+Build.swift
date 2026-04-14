@@ -56,8 +56,7 @@ extension ProjectLayoutNode {
             case .terminal:
                 var config = Ghostty.SurfaceConfiguration()
                 config.workingDirectory = leaf.workingDirectory
-                config.command = leaf.command
-                config.initialInput = leaf.initialInput
+                config.initialInput = leaf.initialInput.map { $0.hasSuffix("\n") ? $0 : $0 + "\n" }
                 config.environmentVariables = leaf.environmentVariables
                 let view = Ghostty.SurfaceView(app, baseConfig: config, uuid: leaf.id)
                 return .leaf(view: PaneLeaf(terminal: view))
@@ -87,13 +86,12 @@ extension ProjectLayoutNode {
     /// from the live split tree — used by `merging(editorFieldsFrom:)` to
     /// preserve these across snapshot writes.
     private struct EditorFields {
-        var command: String?
         var initialInput: String?
         var environmentVariables: [String: String]
     }
 
-    /// Return a new layout whose leaves inherit editor-only fields (`command`,
-    /// `initialInput`, `environmentVariables`) from leaves in `old` that share
+    /// Return a new layout whose leaves inherit editor-only fields
+    /// (`initialInput`, `environmentVariables`) from leaves in `old` that share
     /// the same `ProjectLeaf.id`. Split structure and live-derived fields
     /// (working directory, URL) are preserved from `self`.
     func merging(editorFieldsFrom old: ProjectLayoutNode) -> ProjectLayoutNode {
@@ -108,7 +106,6 @@ extension ProjectLayoutNode {
             // First match wins — skip if this id is already recorded.
             if map[leaf.id] == nil {
                 map[leaf.id] = EditorFields(
-                    command: leaf.command,
                     initialInput: leaf.initialInput,
                     environmentVariables: leaf.environmentVariables
                 )
@@ -128,7 +125,6 @@ extension ProjectLayoutNode {
                 kind: leaf.kind,
                 url: leaf.url,
                 id: leaf.id,
-                command: fields?.command,
                 initialInput: fields?.initialInput,
                 environmentVariables: fields?.environmentVariables ?? [:]
             ))
