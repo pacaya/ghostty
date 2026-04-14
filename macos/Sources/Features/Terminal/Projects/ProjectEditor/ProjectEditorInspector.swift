@@ -64,9 +64,11 @@ struct ProjectEditorInspector: View {
 
         VStack(alignment: .leading, spacing: 4) {
             LabeledContent("Command") {
-                TextField("", text: command, axis: .vertical)
-                    .lineLimit(1...)
-                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    TextField("", text: command, axis: .vertical)
+                        .lineLimit(1...)
+                        .textFieldStyle(.roundedBorder)
+                }
             }
             Text("Runs after the shell loads. A trailing newline is added if missing.")
                 .font(.caption)
@@ -78,6 +80,7 @@ struct ProjectEditorInspector: View {
             // leak across pane selections.
             EnvironmentVariablesEditor(env: env)
                 .id(path)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
