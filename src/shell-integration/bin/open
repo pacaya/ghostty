@@ -43,8 +43,30 @@
 REAL_OPEN=/usr/bin/open
 NC=/usr/bin/nc
 
-# Not inside a Ghostty surface: act as a plain `open` passthrough.
+# tmux strips GHOSTTY_SURFACE_ID when spawning panes unless the user has added
+# it to `update-environment`. Before giving up, try to recover the value from
+# tmux's own env (session-scoped, then global).
+if [ -z "${GHOSTTY_SURFACE_ID:-}" ] && [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then
+    for scope in "" "-g"; do
+        line=$(tmux show-environment $scope GHOSTTY_SURFACE_ID 2>/dev/null) || continue
+        case "$line" in
+            GHOSTTY_SURFACE_ID=*)
+                GHOSTTY_SURFACE_ID=${line#GHOSTTY_SURFACE_ID=}
+                export GHOSTTY_SURFACE_ID
+                break
+                ;;
+        esac
+    done
+fi
+
+# Not inside a Ghostty surface: act as a plain `open` passthrough. If we're in
+# tmux, leave a breadcrumb explaining how to restore routing — silent fallback
+# is confusing because the shim still wins on PATH but can't anchor the split.
 if [ -z "${GHOSTTY_SURFACE_ID:-}" ]; then
+    if [ -n "${TMUX:-}" ]; then
+        printf 'ghostty-open-shim: GHOSTTY_SURFACE_ID unset inside tmux; falling back to %s.\n' "$REAL_OPEN" >&2
+        printf 'Add `set -ga update-environment " GHOSTTY_SURFACE_ID"` to your .tmux.conf to route URLs back to Ghostty.\n' >&2
+    fi
     exec "$REAL_OPEN" "$@"
 fi
 
