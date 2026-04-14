@@ -13,6 +13,7 @@ struct SidebarProjectCard: View {
     @State private var isRenaming: Bool = false
     @State private var renameText: String = ""
     @FocusState private var isRenameFocused: Bool
+    @State private var isEditing = false
 
     private static let cardRadius: CGFloat = 8
 
@@ -122,6 +123,8 @@ struct SidebarProjectCard: View {
                 isRenaming = true
             }
 
+            Button("Edit...") { isEditing = true }
+
             Button("Duplicate") {
                 _ = projectStore.duplicateProject(project)
             }
@@ -137,6 +140,9 @@ struct SidebarProjectCard: View {
             Button("Delete", role: .destructive) {
                 projectStore.deleteProject(id: project.id)
             }
+        }
+        .sheet(isPresented: $isEditing) {
+            ProjectEditorSheet(project: project, projectStore: projectStore)
         }
         .onChange(of: isRenaming) { renaming in
             if renaming {

@@ -13,33 +13,92 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
     }
 
     struct ProjectLeaf: Codable, Equatable {
+        /// Stable identifier for this leaf. Round-trips through persistence so
+        /// that a rebuilt `SurfaceView` / `BrowserPaneContainer` keeps the same
+        /// id it had before the snapshot, which lets callers correlate leaves
+        /// across edits and relaunches.
+        let id: UUID
+
         /// Working directory for a terminal leaf. Ignored for browser leaves.
-        let workingDirectory: String
+        var workingDirectory: String
 
         /// Leaf kind. Defaults to `.terminal` when absent in persisted JSON
         /// so older project files continue to decode.
-        let kind: ProjectLeafKind
+        var kind: ProjectLeafKind
 
         /// URL for a browser leaf. `nil` for terminal leaves.
-        let url: String?
+        var url: String?
 
-        init(workingDirectory: String, kind: ProjectLeafKind = .terminal, url: String? = nil) {
+        /// Optional command override for a terminal leaf. `nil` means inherit
+        /// from the app config (libghostty's "unset → inherit" contract).
+        var command: String?
+
+        /// Optional initial input piped into the terminal on launch.
+        var initialInput: String?
+
+        /// Environment variables merged into the terminal's launch environment.
+        /// Empty dictionary means "no overrides."
+        var environmentVariables: [String: String]
+
+        init(
+            workingDirectory: String,
+            kind: ProjectLeafKind = .terminal,
+            url: String? = nil,
+            id: UUID = UUID(),
+            command: String? = nil,
+            initialInput: String? = nil,
+            environmentVariables: [String: String] = [:]
+        ) {
             self.workingDirectory = workingDirectory
             self.kind = kind
             self.url = url
+            self.id = id
+            self.command = command
+            self.initialInput = initialInput
+            self.environmentVariables = environmentVariables
         }
 
         enum CodingKeys: String, CodingKey {
+            case id
             case workingDirectory
             case kind
             case url
+            case command
+            case initialInput
+            case environmentVariables
         }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
             workingDirectory = try container.decodeIfPresent(String.self, forKey: .workingDirectory) ?? "~"
             kind = try container.decodeIfPresent(ProjectLeafKind.self, forKey: .kind) ?? .terminal
             url = try container.decodeIfPresent(String.self, forKey: .url)
+            command = try container.decodeIfPresent(String.self, forKey: .command)
+            initialInput = try container.decodeIfPresent(String.self, forKey: .initialInput)
+            environmentVariables = try container.decodeIfPresent(
+                [String: String].self, forKey: .environmentVariables) ?? [:]
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(workingDirectory, forKey: .workingDirectory)
+            try container.encode(kind, forKey: .kind)
+            // Normalize empty strings to omitted keys so JSON stays tidy and
+            // matches libghostty's "unset → inherit" contract.
+            if let url, !url.isEmpty {
+                try container.encode(url, forKey: .url)
+            }
+            if let command, !command.isEmpty {
+                try container.encode(command, forKey: .command)
+            }
+            if let initialInput, !initialInput.isEmpty {
+                try container.encode(initialInput, forKey: .initialInput)
+            }
+            if !environmentVariables.isEmpty {
+                try container.encode(environmentVariables, forKey: .environmentVariables)
+            }
         }
     }
 
@@ -108,6 +167,57 @@ extension ProjectLayoutNode {
             return 1
         case .split(let split):
             return split.left.leafCount + split.right.leafCount
+        }
+    }
+
+    /// Return a copy of the tree with every `ProjectLeaf.id` replaced with a
+    /// fresh UUID. Required when cloning a layout (duplicate/import) because
+    /// leaf ids are reused as the live `SurfaceView` / `BrowserPaneContainer`
+    /// UUID — sharing them across copies breaks app-global lookups like
+    /// `AppDelegate.findSurface(forUUID:)` when both copies are open.
+    func withRegeneratedLeafIDs() -> ProjectLayoutNode {
+        switch self {
+        case .leaf(let leaf):
+            return .leaf(ProjectLeaf(
+                workingDirectory: leaf.workingDirectory,
+                kind: leaf.kind,
+                url: leaf.url,
+                id: UUID(),
+                command: leaf.command,
+                initialInput: leaf.initialInput,
+                environmentVariables: leaf.environmentVariables
+            ))
+        case .split(let split):
+            return .split(ProjectSplit(
+                direction: split.direction,
+                ratio: split.ratio,
+                left: split.left.withRegeneratedLeafIDs(),
+                right: split.right.withRegeneratedLeafIDs()
+            ))
+        }
+    }
+
+    /// Return a copy with `command`, `initialInput`, and `environmentVariables`
+    /// cleared from every leaf. Used on import: those fields drive process
+    /// launch and environment, so a shared project file would otherwise be a
+    /// code-execution surface. Users can re-add them explicitly via the
+    /// project editor if they trust the source.
+    func strippingExecutableFields() -> ProjectLayoutNode {
+        switch self {
+        case .leaf(let leaf):
+            return .leaf(ProjectLeaf(
+                workingDirectory: leaf.workingDirectory,
+                kind: leaf.kind,
+                url: leaf.url,
+                id: leaf.id
+            ))
+        case .split(let split):
+            return .split(ProjectSplit(
+                direction: split.direction,
+                ratio: split.ratio,
+                left: split.left.strippingExecutableFields(),
+                right: split.right.strippingExecutableFields()
+            ))
         }
     }
 }

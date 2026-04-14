@@ -126,7 +126,7 @@ final class ProjectStore: ObservableObject {
             id: UUID(),
             name: uniqueName(for: project.name, in: project.folderId),
             color: project.color,
-            layoutRoot: project.layoutRoot,
+            layoutRoot: project.layoutRoot.withRegeneratedLeafIDs(),
             lastModified: Date(),
             folderId: project.folderId,
             sortOrder: nextSortOrder(in: project.folderId)
@@ -367,7 +367,8 @@ final class ProjectStore: ObservableObject {
 
         if let existingId = existingProjectId,
            let idx = projects.firstIndex(where: { $0.id == existingId }) {
-            projects[idx].layoutRoot = layoutRoot
+            let merged = layoutRoot.merging(editorFieldsFrom: projects[idx].layoutRoot)
+            projects[idx].layoutRoot = merged
             projects[idx].color = tabColor
             projects[idx].name = name
             projects[idx].lastModified = Date()
@@ -400,11 +401,18 @@ final class ProjectStore: ObservableObject {
         let file = try Self.decoder.decode(ProjectsFile.self, from: data)
         var imported: [Project] = []
         for project in file.projects {
+            // Sanitize the imported layout: regenerate leaf ids so they don't
+            // collide with anything already in the store, and strip per-leaf
+            // command / initialInput / environmentVariables since a shared
+            // project file would otherwise be a code-execution surface.
+            let sanitizedLayout = project.layoutRoot
+                .strippingExecutableFields()
+                .withRegeneratedLeafIDs()
             let copy = Project(
                 id: UUID(),
                 name: uniqueName(for: project.name, in: nil),
                 color: project.color,
-                layoutRoot: project.layoutRoot,
+                layoutRoot: sanitizedLayout,
                 lastModified: Date(),
                 folderId: nil,
                 sortOrder: nextSortOrder(in: nil)
