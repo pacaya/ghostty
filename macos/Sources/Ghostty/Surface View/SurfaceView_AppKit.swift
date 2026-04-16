@@ -1672,10 +1672,19 @@ extension Ghostty {
         func handleUserNotification(notification: UNNotification, focus: Bool) {
             let id = notification.request.identifier
             guard self.notificationIdentifiers.remove(id) != nil else { return }
-            if focus {
-                self.window?.makeKeyAndOrderFront(self)
-                Ghostty.moveFocus(to: self)
+            guard focus, let window = self.window else { return }
+
+            NSApp.activate()
+            if window.isOnActiveSpace {
+                window.makeKeyAndOrderFront(self)
+            } else {
+                // makeKeyAndOrderFront on a window in another Space intermittently
+                // drags the window to the active Space instead of switching
+                // Spaces. orderFront + makeKey reliably triggers the Space switch.
+                window.orderFront(nil)
+                window.makeKey()
             }
+            Ghostty.moveFocus(to: self)
         }
 
         struct DerivedConfig {
@@ -1731,6 +1740,18 @@ extension Ghostty {
             config.workingDirectory = try container.decode(String?.self, forKey: .pwd)
             let savedTitle = try container.decodeIfPresent(String.self, forKey: .title)
             let isUserSetTitle = try container.decodeIfPresent(Bool.self, forKey: .isUserSetTitle) ?? false
+
+            // Project tabs re-apply their leaf's initialInput and
+            // environmentVariables at restore time, matching the panel-open
+            // behavior. The context is populated for this surfaceTree decode
+            // only; see SurfaceRestoreContext.
+            if let uuid,
+               let leaf = MainActor.assumeIsolated({
+                   SurfaceRestoreContext.leafConfigs[uuid]
+               }) {
+                config.initialInput = leaf.initialInput.map { $0.ensuringTrailingNewline() }
+                config.environmentVariables = leaf.environmentVariables
+            }
 
             self.init(app, baseConfig: config, uuid: uuid)
 

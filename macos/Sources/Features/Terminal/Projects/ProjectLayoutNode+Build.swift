@@ -56,7 +56,7 @@ extension ProjectLayoutNode {
             case .terminal:
                 var config = Ghostty.SurfaceConfiguration()
                 config.workingDirectory = leaf.workingDirectory
-                config.initialInput = leaf.initialInput.map { $0.hasSuffix("\n") ? $0 : $0 + "\n" }
+                config.initialInput = leaf.initialInput.map { $0.ensuringTrailingNewline() }
                 config.environmentVariables = leaf.environmentVariables
                 let view = Ghostty.SurfaceView(app, baseConfig: config, uuid: leaf.id)
                 return .leaf(view: PaneLeaf(terminal: view))
@@ -82,30 +82,27 @@ extension ProjectLayoutNode {
         }
     }
 
-    /// Editor-only fields carried by a `ProjectLeaf` that aren't recoverable
-    /// from the live split tree — used by `merging(editorFieldsFrom:)` to
-    /// preserve these across snapshot writes.
-    private struct EditorFields {
-        var initialInput: String?
-        var environmentVariables: [String: String]
-    }
-
     /// Return a new layout whose leaves inherit editor-only fields
     /// (`initialInput`, `environmentVariables`) from leaves in `old` that share
     /// the same `ProjectLeaf.id`. Split structure and live-derived fields
     /// (working directory, URL) are preserved from `self`.
     func merging(editorFieldsFrom old: ProjectLayoutNode) -> ProjectLayoutNode {
-        var map: [UUID: EditorFields] = [:]
-        old.collectEditorFields(into: &map)
-        return applyingEditorFields(map)
+        applyingEditorFields(old.editorFieldsByLeafID())
     }
 
-    private func collectEditorFields(into map: inout [UUID: EditorFields]) {
+    /// Recursively collect each leaf's editor-only fields keyed by leaf id.
+    /// First match wins if the same id appears more than once.
+    func editorFieldsByLeafID() -> [UUID: ProjectLeafEditorFields] {
+        var map: [UUID: ProjectLeafEditorFields] = [:]
+        collectEditorFields(into: &map)
+        return map
+    }
+
+    private func collectEditorFields(into map: inout [UUID: ProjectLeafEditorFields]) {
         switch self {
         case .leaf(let leaf):
-            // First match wins — skip if this id is already recorded.
             if map[leaf.id] == nil {
-                map[leaf.id] = EditorFields(
+                map[leaf.id] = ProjectLeafEditorFields(
                     initialInput: leaf.initialInput,
                     environmentVariables: leaf.environmentVariables
                 )
@@ -116,7 +113,7 @@ extension ProjectLayoutNode {
         }
     }
 
-    private func applyingEditorFields(_ map: [UUID: EditorFields]) -> ProjectLayoutNode {
+    private func applyingEditorFields(_ map: [UUID: ProjectLeafEditorFields]) -> ProjectLayoutNode {
         switch self {
         case .leaf(let leaf):
             let fields = map[leaf.id]

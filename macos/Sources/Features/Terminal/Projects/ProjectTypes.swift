@@ -215,6 +215,14 @@ extension ProjectLayoutNode {
     }
 }
 
+/// Editor-mutable subset of `ProjectLeaf` fields — the ones not derivable from
+/// a live split tree and which need to round-trip through operations like
+/// `merging(editorFieldsFrom:)` and window-state restoration.
+struct ProjectLeafEditorFields: Codable, Equatable {
+    var initialInput: String?
+    var environmentVariables: [String: String]
+}
+
 struct ProjectsFile: Codable {
     static let currentVersion = 1
     var version: Int = Self.currentVersion

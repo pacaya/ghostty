@@ -27,6 +27,11 @@ extension String {
     }
 #endif
 
+    /// Returns self with a trailing newline appended if one isn't already present.
+    func ensuringTrailingNewline() -> String {
+        hasSuffix("\n") ? self : self + "\n"
+    }
+
     /// Converts a four-character ASCII string to its `FourCharCode` (`UInt32`) value.
     var fourCharCode: UInt32 {
         assert(count <= 4, "FourCharCode string must be at most 4 characters")

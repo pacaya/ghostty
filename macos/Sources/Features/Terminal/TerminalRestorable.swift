@@ -39,6 +39,15 @@ extension TerminalRestorable {
     }
 }
 
+/// Main-actor context used during `NSWindowRestoration` to pass per-leaf project
+/// config from `TerminalRestorableState.init(from:)` into `SurfaceView.init(from:)`.
+/// Safe because window restoration runs serially on the main actor and clears
+/// the context as soon as the surface tree has been decoded.
+@MainActor
+enum SurfaceRestoreContext {
+    static var leafConfigs: [UUID: ProjectLeafEditorFields] = [:]
+}
+
 /// The state stored for terminal window restoration.
 class TerminalRestorableState: TerminalRestorable {
     class var version: Int { 7 }
@@ -51,6 +60,10 @@ class TerminalRestorableState: TerminalRestorable {
     /// The associated project ID, if this tab is linked to a saved project.
     /// Optional field added without version bump — old state decodes with nil.
     let projectId: UUID?
+    /// Per-leaf project config (initialInput, environmentVariables) keyed by
+    /// SurfaceView UUID. Optional field added without version bump — old state
+    /// decodes with an empty dict.
+    let leafConfigs: [UUID: ProjectLeafEditorFields]
 
     init(from controller: TerminalController) {
         self.focusedSurface = controller.focusedSurface?.id.uuidString
@@ -59,9 +72,22 @@ class TerminalRestorableState: TerminalRestorable {
         self.tabColor = (controller.window as? TerminalWindow)?.tabColor ?? .none
         self.titleOverride = controller.titleOverride
         if let window = controller.window {
-            self.projectId = MainActor.assumeIsolated { ProjectStore.shared.projectId(for: window) }
+            let projectId = MainActor.assumeIsolated { ProjectStore.shared.projectId(for: window) }
+            self.projectId = projectId
+            if let projectId,
+               let project = MainActor.assumeIsolated({
+                   ProjectStore.shared.projects.first { $0.id == projectId }
+               }) {
+                // Only keep leaves that actually have something to restore.
+                self.leafConfigs = project.layoutRoot.editorFieldsByLeafID().filter { _, fields in
+                    !(fields.initialInput?.isEmpty ?? true) || !fields.environmentVariables.isEmpty
+                }
+            } else {
+                self.leafConfigs = [:]
+            }
         } else {
             self.projectId = nil
+            self.leafConfigs = [:]
         }
     }
 
@@ -72,7 +98,56 @@ class TerminalRestorableState: TerminalRestorable {
         self.tabColor = other.tabColor
         self.titleOverride = other.titleOverride
         self.projectId = other.projectId
+        self.leafConfigs = other.leafConfigs
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case focusedSurface
+        case surfaceTree
+        case effectiveFullscreenMode
+        case tabColor
+        case titleOverride
+        case projectId
+        case leafConfigs
+    }
+
+    /// Custom decode to populate `SurfaceRestoreContext.leafConfigs` before the
+    /// `surfaceTree` field is decoded — that's when `SurfaceView.init(from:)`
+    /// fires for each leaf and needs to read its per-leaf project config.
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.focusedSurface = try container.decodeIfPresent(String.self, forKey: .focusedSurface)
+        self.effectiveFullscreenMode = try container.decodeIfPresent(FullscreenMode.self, forKey: .effectiveFullscreenMode)
+        self.tabColor = try container.decodeIfPresent(TerminalTabColor.self, forKey: .tabColor) ?? .none
+        self.titleOverride = try container.decodeIfPresent(String.self, forKey: .titleOverride)
+        self.projectId = try container.decodeIfPresent(UUID.self, forKey: .projectId)
+        let leafConfigs = try container.decodeIfPresent([UUID: ProjectLeafEditorFields].self, forKey: .leafConfigs) ?? [:]
+        self.leafConfigs = leafConfigs
+
+        MainActor.assumeIsolated {
+            SurfaceRestoreContext.leafConfigs = leafConfigs
+        }
+        defer {
+            MainActor.assumeIsolated {
+                SurfaceRestoreContext.leafConfigs = [:]
+            }
+        }
+        self.surfaceTree = try container.decode(SplitTree<PaneLeaf>.self, forKey: .surfaceTree)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(focusedSurface, forKey: .focusedSurface)
+        try container.encode(surfaceTree, forKey: .surfaceTree)
+        try container.encodeIfPresent(effectiveFullscreenMode, forKey: .effectiveFullscreenMode)
+        try container.encode(tabColor, forKey: .tabColor)
+        try container.encodeIfPresent(titleOverride, forKey: .titleOverride)
+        try container.encodeIfPresent(projectId, forKey: .projectId)
+        if !leafConfigs.isEmpty {
+            try container.encode(leafConfigs, forKey: .leafConfigs)
+        }
+    }
+
 }
 
 enum TerminalRestoreError: Error {
