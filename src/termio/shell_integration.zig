@@ -917,6 +917,22 @@ fn setupZsh(
     integ_dir.close();
     try env.put("ZDOTDIR", integ_path);
 
+    // With ZDOTDIR permanently set to our integration dir, zsh's default
+    // HISTFILE ($ZDOTDIR/.zsh_history) would land inside the app bundle.
+    // Set it to ~/.zsh_history if the user hasn't set it themselves.
+    if (env.get("HISTFILE") == null) {
+        var home_buf: [1024]u8 = undefined;
+        if (try homedir.home(&home_buf)) |home| {
+            var histfile_buf: [std.fs.max_path_bytes]u8 = undefined;
+            const histfile = try std.fmt.bufPrint(
+                &histfile_buf,
+                "{s}/.zsh_history",
+                .{home},
+            );
+            try env.put("HISTFILE", histfile);
+        }
+    }
+
     return try command.clone(alloc);
 }
 

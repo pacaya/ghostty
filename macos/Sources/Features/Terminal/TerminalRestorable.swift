@@ -121,7 +121,23 @@ class TerminalRestorableState: TerminalRestorable {
         self.tabColor = try container.decodeIfPresent(TerminalTabColor.self, forKey: .tabColor) ?? .none
         self.titleOverride = try container.decodeIfPresent(String.self, forKey: .titleOverride)
         self.projectId = try container.decodeIfPresent(UUID.self, forKey: .projectId)
-        let leafConfigs = try container.decodeIfPresent([UUID: ProjectLeafEditorFields].self, forKey: .leafConfigs) ?? [:]
+        let encodedLeafConfigs = try container.decodeIfPresent(
+            [UUID: ProjectLeafEditorFields].self, forKey: .leafConfigs) ?? [:]
+
+        // Prefer the live project store so edits take effect on the next
+        // restore. Fall back to the encoded snapshot when the project has
+        // been deleted.
+        let leafConfigs: [UUID: ProjectLeafEditorFields]
+        if let projectId,
+           let project = MainActor.assumeIsolated({
+               ProjectStore.shared.projects.first { $0.id == projectId }
+           }) {
+            leafConfigs = project.layoutRoot.editorFieldsByLeafID().filter { _, fields in
+                !(fields.initialInput?.isEmpty ?? true) || !fields.environmentVariables.isEmpty
+            }
+        } else {
+            leafConfigs = encodedLeafConfigs
+        }
         self.leafConfigs = leafConfigs
 
         MainActor.assumeIsolated {

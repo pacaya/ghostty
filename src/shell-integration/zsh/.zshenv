@@ -64,6 +64,15 @@
     # its directory.
     'builtin' 'export' ZDOTDIR="${${(%):-%x}:A:h}"
 
+    # Zsh defaults HISTFILE to $ZDOTDIR/.zsh_history, but may not apply
+    # that default until after startup files. With ZDOTDIR pointing at
+    # our integration dir, history would land inside the app bundle and
+    # be lost on updates. Set a safe default if HISTFILE is unset or
+    # already points into our dir. The user's .zshrc can still override.
+    if [[ -z "${HISTFILE+set}" || "${HISTFILE-}" = "${ZDOTDIR}/"* ]]; then
+        'builtin' 'export' HISTFILE="${HOME}/.zsh_history"
+    fi
+
     if [[ -o 'interactive' ]]; then
         _ghostty_file="${ZDOTDIR}/ghostty-integration"
         if [[ -r "$_ghostty_file" ]]; then

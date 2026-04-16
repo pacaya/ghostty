@@ -173,8 +173,10 @@ struct SidebarProjectCard: View {
         }
         controller.titleOverride = project.name
 
-        // Add as tab to current window group
-        if let parentWindow = tabManager.tabs.first?.window {
+        // Add as tab after the currently selected tab
+        if let selectedWindow = tabManager.tabs.first(where: { $0.isSelected })?.window {
+            selectedWindow.addTabbedWindow(controller.window!, ordered: .above)
+        } else if let parentWindow = tabManager.tabs.first?.window {
             parentWindow.addTabbedWindow(controller.window!, ordered: .above)
         }
 
