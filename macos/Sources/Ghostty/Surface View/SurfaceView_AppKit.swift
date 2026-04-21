@@ -1675,16 +1675,39 @@ extension Ghostty {
             guard focus, let window = self.window else { return }
 
             NSApp.activate()
+
+            if window.isOnActiveSpace {
+                // Same Space: ordering the window front is safe and desired.
+                window.makeKeyAndOrderFront(self)
+                Ghostty.moveFocus(to: self)
+                return
+            }
+
+            // Window is on another Space. Any window-ordering call here
+            // (makeKeyAndOrderFront / orderFront) races the system Space
+            // switch and ~20% of the time drags the window to the current
+            // Space instead of switching to the window's Space. Schedule the
+            // focus work to happen once the window is on the active Space,
+            // and do nothing to the window in the meantime.
+            scheduleFocusWhenOnActiveSpace(window: window)
+        }
+
+        /// Wait for `window` to arrive on the active Space (triggered by the
+        /// system's Mission Control Space-switch behavior), then bring it to
+        /// the front of its Space and focus this surface. Times out after a
+        /// short window so we never spin forever.
+        private func scheduleFocusWhenOnActiveSpace(window: NSWindow, attempts: Int = 0) {
+            let maxAttempts = 40 // ~2s with 50ms steps
             if window.isOnActiveSpace {
                 window.makeKeyAndOrderFront(self)
-            } else {
-                // makeKeyAndOrderFront on a window in another Space intermittently
-                // drags the window to the active Space instead of switching
-                // Spaces. orderFront + makeKey reliably triggers the Space switch.
-                window.orderFront(nil)
-                window.makeKey()
+                Ghostty.moveFocus(to: self)
+                return
             }
-            Ghostty.moveFocus(to: self)
+            guard attempts < maxAttempts else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(50)) { [weak self, weak window] in
+                guard let self, let window else { return }
+                self.scheduleFocusWhenOnActiveSpace(window: window, attempts: attempts + 1)
+            }
         }
 
         struct DerivedConfig {
