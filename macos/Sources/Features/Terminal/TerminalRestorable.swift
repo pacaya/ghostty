@@ -71,24 +71,14 @@ class TerminalRestorableState: TerminalRestorable {
         self.effectiveFullscreenMode = controller.fullscreenStyle?.fullscreenMode
         self.tabColor = (controller.window as? TerminalWindow)?.tabColor ?? .none
         self.titleOverride = controller.titleOverride
-        if let window = controller.window {
-            let projectId = MainActor.assumeIsolated { ProjectStore.shared.projectId(for: window) }
-            self.projectId = projectId
-            if let projectId,
-               let project = MainActor.assumeIsolated({
-                   ProjectStore.shared.projects.first { $0.id == projectId }
-               }) {
-                // Only keep leaves that actually have something to restore.
-                self.leafConfigs = project.layoutRoot.editorFieldsByLeafID().filter { _, fields in
-                    !(fields.initialInput?.isEmpty ?? true) || !fields.environmentVariables.isEmpty
-                }
-            } else {
-                self.leafConfigs = [:]
-            }
-        } else {
-            self.projectId = nil
-            self.leafConfigs = [:]
+        let project = controller.projectId.flatMap { id in
+            MainActor.assumeIsolated { ProjectStore.shared.projects.first { $0.id == id } }
         }
+        self.projectId = project?.id
+        // Only persist leaves that actually have something to restore.
+        self.leafConfigs = project?.layoutRoot.editorFieldsByLeafID().filter { _, fields in
+            !(fields.initialInput?.isEmpty ?? true) || !fields.environmentVariables.isEmpty
+        } ?? [:]
     }
 
     required init(copy other: TerminalRestorableState) {
@@ -227,11 +217,11 @@ class TerminalWindowRestoration: NSObject, NSWindowRestoration {
         // Restore the tab title override
         c.titleOverride = state.titleOverride
 
-        // Restore project association
-        if let projectId = state.projectId {
-            MainActor.assumeIsolated {
-                ProjectStore.shared.associate(window: window, with: projectId)
-            }
+        // Drop dangling project IDs: the referenced project may have been
+        // deleted while this window's state was dormant.
+        if let pid = state.projectId,
+           MainActor.assumeIsolated({ ProjectStore.shared.projects.contains(where: { $0.id == pid }) }) {
+            c.projectId = pid
         }
 
         // Setup our restored state on the controller

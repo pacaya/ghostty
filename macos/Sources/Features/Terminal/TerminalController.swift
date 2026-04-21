@@ -70,6 +70,14 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     /// The sidebar hosting view, kept for theme updates on config change.
     private var sidebarHostingView: NSHostingView<SidebarContainerView>?
 
+    /// The project this tab is associated with, if any. Persisted via restorable state.
+    var projectId: UUID? {
+        didSet {
+            guard projectId != oldValue else { return }
+            invalidateRestorableState()
+        }
+    }
+
 
     init(_ ghostty: Ghostty.App,
          withBaseConfig base: Ghostty.SurfaceConfiguration? = nil,

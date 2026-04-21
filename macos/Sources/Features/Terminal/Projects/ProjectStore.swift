@@ -15,9 +15,6 @@ final class ProjectStore: ObservableObject {
     @Published private(set) var projects: [Project] = []
     @Published private(set) var folders: [ProjectFolder] = []
 
-    /// Runtime-only mapping from open tab windows to project IDs.
-    @Published private(set) var associations: [ObjectIdentifier: UUID] = [:]
-
     private var isDirty = false
     private var saveCancellable: AnyCancellable?
 
@@ -97,9 +94,8 @@ final class ProjectStore: ObservableObject {
     }
 
     func deleteProject(id: UUID) {
-        // Disassociate any open tab
-        if let entry = associations.first(where: { $0.value == id }) {
-            associations.removeValue(forKey: entry.key)
+        for controller in TerminalController.all where controller.projectId == id {
+            controller.projectId = nil
         }
         projects.removeAll { $0.id == id }
         isDirty = true
@@ -292,36 +288,27 @@ final class ProjectStore: ObservableObject {
     // MARK: - Tab Association
 
     func associate(window: NSWindow, with projectId: UUID) {
-        associations[ObjectIdentifier(window)] = projectId
+        guard let controller = window.windowController as? TerminalController else { return }
+        objectWillChange.send()
+        controller.projectId = projectId
     }
 
     func disassociate(window: NSWindow) {
-        associations.removeValue(forKey: ObjectIdentifier(window))
+        guard let controller = window.windowController as? TerminalController else { return }
+        objectWillChange.send()
+        controller.projectId = nil
     }
 
     func projectId(for window: NSWindow) -> UUID? {
-        associations[ObjectIdentifier(window)]
+        (window.windowController as? TerminalController)?.projectId
     }
 
     func window(for projectId: UUID) -> NSWindow? {
-        guard let entry = associations.first(where: { $0.value == projectId }) else {
-            return nil
-        }
-        return NSApplication.shared.windows.first {
-            ObjectIdentifier($0) == entry.key
-        }
+        TerminalController.all.first(where: { $0.projectId == projectId })?.window
     }
 
     func isOpen(_ projectId: UUID) -> Bool {
-        associations.values.contains(projectId)
-    }
-
-    /// Remove entries for windows that no longer exist.
-    func purgeStale() {
-        let liveWindows = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
-        for key in associations.keys where !liveWindows.contains(key) {
-            associations.removeValue(forKey: key)
-        }
+        TerminalController.all.contains(where: { $0.projectId == projectId })
     }
 
     /// Snapshot a tab into a new project, place it in `targetFolderId`, and
