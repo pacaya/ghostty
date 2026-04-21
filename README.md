@@ -1,32 +1,25 @@
-**Personal fork of [Ghostty](https://github.com/ghostty-org/ghostty)** with a sidebar tab system for macOS. Not affiliated with the upstream project. For the official Ghostty terminal, visit [ghostty.org](https://ghostty.org).
+**Opinionated macOS-only fork of [Ghostty](https://github.com/ghostty-org/ghostty)** maintained for agentic development. It stays compatible with upstream — I merge from [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) regularly — and layers on the workflow features I need to run coding agents (Claude Code, Codex, etc.) without leaving the terminal. The sidebar / vertical tab system is based on [tomreinert/ghostty](https://github.com/tomreinert/ghostty).
 
-🧪 **Experimental**  
-Please note that this is experimental and I built it for my own use. It works fine for me, but feel free and try to break it.
+Not affiliated with upstream Ghostty. For the official, cross-platform Ghostty, see [ghostty.org](https://ghostty.org).
 
-🐛 **Known bugs**  
-~~- Unread indicator does not clear correctly, and might re-appear when switching tabs~~
+<img width="1500" alt="ghostty-agentic-fork" src="https://github.com/user-attachments/assets/16a23cf3-360f-48ed-a1cb-beb3ca8e8a5f" />
 
-<img width="1125" height="749" alt="ghostty-sidebar" src="https://github.com/user-attachments/assets/919a9220-4e07-4b2e-b491-c9d385b6585f" />
+## What this fork adds
 
+- **Vertical sidebar tabs** — left-side tab list with rich cards (title, directory, git branch, custom status entries, attention dot, drag-and-drop reorder). Based on [tomreinert/ghostty](https://github.com/tomreinert/ghostty).
+- **Colored tabs** — per-tab color accents so long agent sessions stay visually distinct.
+- **Projects** — group tabs and their layout into named projects in the sidebar.
+- **Project persistence** — projects and per-leaf editor state (command, env, directory) survive window restore.
+- **Browser panes** — embedded webviews inside the split tree, for web dev and for keeping tools like Plannotator or IPE in the same window as the agent driving the work.
 
-## Sidebar
-
-Replaces the native tab bar with a left sidebar showing rich tab cards:
-
-- **Title, directory, git branch** — git branch detected automatically, no setup needed
-- **Custom status entries** — show ports, environments, or any metadata via CLI
-- **Attention indicators** — orange dot on tabs with notifications or bell
-- **Drag-and-drop** — reorder tabs by dragging
-- **Theme-aware** — colors derived from your terminal theme
-
-### Config
+### Sidebar config
 
 ```
 # Choose which fields to show (default: all)
 sidebar-fields = title,directory,git-branch,status
 ```
 
-### CLI
+### `ghosttyctl` CLI
 
 Install: symlink `cli/ghosttyctl` to somewhere on your PATH (e.g. `~/.local/bin/ghosttyctl`).
 
