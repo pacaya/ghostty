@@ -9,11 +9,13 @@ class SidebarTabManager: ObservableObject {
         let title: String
         let pwd: String?
         let gitBranch: String?
+        let webTitle: String?
         let surfaceId: UUID?
         let statusEntries: [TabMetadataStore.StatusEntry]
         let isSelected: Bool
         let needsAttention: Bool
         let hasRunningProcess: Bool
+        let hasTitleOverride: Bool
         let tabColor: TerminalTabColor
         let window: NSWindow
 
@@ -28,13 +30,25 @@ class SidebarTabManager: ObservableObject {
             title.hasPrefix("\u{1F514} ") ? String(title.dropFirst(3)) : title
         }
 
+        /// Card's primary title. Falls back to the browser page title on pure
+        /// browser tabs so the card doesn't show a stale terminal command.
+        /// A user-set `titleOverride` always wins over the page title.
+        var cardTitle: String {
+            if let webTitle, !hasTitleOverride {
+                return webTitle
+            }
+            return displayTitle
+        }
+
         static func == (lhs: TabItem, rhs: TabItem) -> Bool {
             lhs.id == rhs.id && lhs.title == rhs.title && lhs.isSelected == rhs.isSelected
                 && lhs.pwd == rhs.pwd && lhs.gitBranch == rhs.gitBranch
+                && lhs.webTitle == rhs.webTitle
                 && lhs.surfaceId == rhs.surfaceId
                 && lhs.statusEntries == rhs.statusEntries
                 && lhs.needsAttention == rhs.needsAttention
                 && lhs.hasRunningProcess == rhs.hasRunningProcess
+                && lhs.hasTitleOverride == rhs.hasTitleOverride
                 && lhs.tabColor == rhs.tabColor
         }
     }
@@ -184,25 +198,43 @@ class SidebarTabManager: ObservableObject {
 
         let newTabs = tabWindows.map { w -> TabItem in
             let controller = w.windowController as? BaseTerminalController
-            let surface = controller?.focusedSurface
+            let focusedSurface = controller?.focusedSurface
+            let tree = controller?.surfaceTree
             let wid = ObjectIdentifier(w)
-            let sid = surface?.id
-            let pwd = surface?.pwd
+
+            // Metadata surface is the focused terminal, or the first terminal
+            // leaf if focus is on a browser pane. For pure-browser tabs no
+            // terminal exists, so metadataSurface stays nil and webTitle takes
+            // over as the card's secondary line.
+            let metadataSurface: Ghostty.SurfaceView? =
+                focusedSurface ?? tree?.first(where: { $0.isTerminal })?.terminal
+            let sid = metadataSurface?.id
+            let pwd = metadataSurface?.pwd
             let entries = sid.map { metadataStore.statusEntries(for: $0) } ?? []
             let branch = pwd.flatMap { gitBranch(at: $0) }
+            let webTitle: String? = {
+                guard metadataSurface == nil,
+                      let browser = tree?.first(where: { $0.isBrowser })?.browser
+                else { return nil }
+                let title = browser.title
+                return title.isEmpty ? nil : title
+            }()
             let color = (w as? TerminalWindow)?.tabColor ?? .none
-            let hasRunningProcess = controller?.surfaceTree.contains(where: { $0.terminal?.needsConfirmQuit == true }) ?? false
+            let hasRunningProcess = tree?.contains(where: { $0.terminal?.needsConfirmQuit == true }) ?? false
+            let hasTitleOverride = controller?.titleOverride != nil
 
             return TabItem(
                 id: wid,
                 title: w.title,
                 pwd: pwd,
                 gitBranch: branch,
+                webTitle: webTitle,
                 surfaceId: sid,
                 statusEntries: entries,
                 isSelected: w === selectedWindow,
                 needsAttention: attentionWindows.contains(wid) && w !== selectedWindow,
                 hasRunningProcess: hasRunningProcess,
+                hasTitleOverride: hasTitleOverride,
                 tabColor: color,
                 window: w
             )
