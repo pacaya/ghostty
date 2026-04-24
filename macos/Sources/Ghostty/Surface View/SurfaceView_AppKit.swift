@@ -632,7 +632,8 @@ extension Ghostty {
             }
             // We should use window to perform hitTest here,
             // because there could be some other overlays on top, like search bar
-            guard window.contentView?.hitTest(location) == self else { return event }
+            // guard window.contentView?.hitTest(location) == self else { return event }
+            guard window.contentView?.hitTest(event.locationInWindow) == self else { return event }
 
             // We always assume that we're resetting our mouse suppression
             // unless we see the specific scenario below to set it.
