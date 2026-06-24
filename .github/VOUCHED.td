@@ -20,9 +20,11 @@
 # "!denounce" or "!denounce [username]" on a discussion.
 00-kat
 007hacky007
+00jciv00
 04cb
 0xdvc
 -4rh1t3ct0r7
+52dyd
 aalhendi
 aaron-ang
 abdurrahmanski
@@ -31,10 +33,12 @@ adrum
 agoodkind
 aindriu80
 ajiblock
+ajr-khll
 akimiojr
 alaasdk
 alanmoyano
 alaviss
+alexbathome
 alexfeijoo44
 alexjuca
 alosarjos
@@ -43,7 +47,10 @@ andrejdaskalov
 anhthang
 anmitalidev
 anthonyzhoon
+athaapa
 atomk
+b0uks
+b1nar10
 balazs-szucs
 barutsrb
 bch
@@ -57,6 +64,7 @@ bleikurr
 bo2themax
 brentschroeter
 brianc442
+c0x0o
 cespare
 charliie-dev
 chernetskyi
@@ -65,6 +73,7 @@ cmwetherell
 crayxt
 craziestowl
 curtismoncoq
+-cznorth Automated advertising + likely AI communication
 d-dudas
 -daedaevibin
 daiimus
@@ -91,8 +100,11 @@ elias8
 -enkr1
 enzowilliam
 ephemera
+-eric-assetpass Try talking, not botting
 eriksremess
 erral
+exlee
+-f1813483-netizen
 faukah
 filip7
 flou
@@ -120,6 +132,7 @@ illiakrauchanka
 j0hnm4r5
 jacobsandlund
 jake-stewart
+jamesarch
 jamylak
 jarred-sumner
 jcollie
@@ -146,11 +159,13 @@ kloneets
 knu
 -kody-w
 koranir
+kostich
 kristina8888
 kristofersoler
 kylesower
 laxystem
 lebdron
+lepips
 liby
 linustalacko
 lonsagisawa
@@ -164,6 +179,7 @@ markdorison
 markhuot
 marler8997
 marrocco-simone
+masterflitzer
 matkotiric
 mattn
 micaeljarniac
@@ -171,10 +187,13 @@ michielvk
 miguelelgallo
 mihi314
 mikailmm
+minorcell
 misairuzame
 mischief
 mitchellh
 miupa
+mjbommar
+mohshami
 molechowski
 moonmao42
 -morgengeluk Appears to be using AI inappropriately even after it was requested they abide by the AI policy (there is clear evidence of the person-in-the-loop not attempting to clean up AI generated text, and their AI disclosure itself reads like AI-generated text and shows no signs of remorse or intent to improve).
@@ -187,8 +206,11 @@ neo773
 neurosnap
 nicholas-ochoa
 nicosuave
+nikicat
+nilsherzig
 nmggithub
 noib3
+nolinmcfarland
 nouritsu
 nwehg
 ocean6954
@@ -209,8 +231,11 @@ poweruser64
 prakhar54-byte
 priyans-hu
 puzza007
+qappell
 qwerasd205
+raphamorim
 reo101
+rewdy
 rgehan
 rhodes-b
 rightaditya
@@ -219,8 +244,10 @@ rmengelbrecht
 rmunn
 rockorager
 rpfaeffle
+sahilkmishra
 samasaur1
 sandydoo
+-schickling-assistant NHITL
 secrus
 seruman
 seyoungjeong
@@ -230,6 +257,7 @@ sunshine-syz
 tbrundige
 tdgroot
 tdslot
+thirstycrow
 thoutbeckers
 ticclick
 tnagatomi
@@ -240,6 +268,7 @@ tweedbeetle
 uhojin
 unphased
 uzaaft
+vancluever
 vaughanandrews
 viruslobster
 vlsi
@@ -248,6 +277,7 @@ wyounas
 yabbal
 yamshta
 ydah
+-zaviro
 zenyr
 zeshi09
 zubb
