@@ -29,8 +29,7 @@ struct QuickTerminalIntent: AppIntent {
 
         // Grab all our terminals
         var terminals: [TerminalEntity] = []
-        for leaf in c.surfaceTree.root?.leaves() ?? [] {
-            guard let view = leaf.terminal else { continue }
+        for view in c.surfaceTree.root?.leaves() ?? [] {
             if wasInitialized {
                 terminals.append(TerminalEntity(view))
             } else {

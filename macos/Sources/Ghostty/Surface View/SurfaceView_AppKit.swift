@@ -1872,6 +1872,12 @@ extension Ghostty {
             case isUserSetTitle
         }
 
+        /// Keys of the leaf wrapper written by fork builds that had browser
+        /// panes. See the legacy unwrap in `init(from:)`.
+        private enum LegacyPaneLeafCodingKeys: String, CodingKey {
+            case payload
+        }
+
         required convenience init(from decoder: Decoder) throws {
             // Decoding uses the global Ghostty app
             guard let del = NSApplication.shared.delegate,
@@ -1880,7 +1886,17 @@ extension Ghostty {
                 throw TerminalRestoreError.delegateInvalid
             }
 
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            // Transitional: fork builds with browser panes saved each leaf as
+            // {"tag": ..., "payload": <surface>}. Unwrap terminal payloads so
+            // windows saved by those builds restore once. Safe to remove after
+            // every machine has relaunched on a build without browser panes.
+            let container: KeyedDecodingContainer<CodingKeys>
+            if let legacy = try? decoder.container(keyedBy: LegacyPaneLeafCodingKeys.self),
+               legacy.contains(.payload) {
+                container = try legacy.nestedContainer(keyedBy: CodingKeys.self, forKey: .payload)
+            } else {
+                container = try decoder.container(keyedBy: CodingKeys.self)
+            }
             let uuid = UUID(uuidString: try container.decode(String.self, forKey: .uuid))
             var config = Ghostty.SurfaceConfiguration()
             config.workingDirectory = try container.decode(String?.self, forKey: .pwd)

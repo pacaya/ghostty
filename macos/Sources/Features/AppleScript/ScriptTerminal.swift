@@ -211,7 +211,7 @@ enum ScriptSplitDirection {
         }
     }
 
-    var splitDirection: SplitTree<PaneLeaf>.NewDirection {
+    var splitDirection: SplitTree<Ghostty.SurfaceView>.NewDirection {
         switch self {
         case .right: .right
         case .left: .left

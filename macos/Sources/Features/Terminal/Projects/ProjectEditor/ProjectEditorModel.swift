@@ -159,8 +159,6 @@ final class ProjectEditorModel: ObservableObject {
             let env = leaf.environmentVariables.filter { !$0.key.isEmpty }
             let normalized = ProjectLeaf(
                 workingDirectory: leaf.workingDirectory,
-                kind: leaf.kind,
-                url: leaf.url,
                 id: leaf.id,
                 initialInput: initialInput,
                 environmentVariables: env

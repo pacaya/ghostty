@@ -18,7 +18,7 @@ extension TerminalRestorableState {
     }
 }
 
-extension TerminalRestorableState.InternalState where ViewType == PaneLeaf {
+extension TerminalRestorableState.InternalState where ViewType == Ghostty.SurfaceView {
     init(from controller: TerminalController) {
         self.init(
             focusedSurface: controller.focusedSurface?.id.uuidString,

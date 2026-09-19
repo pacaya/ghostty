@@ -2,24 +2,17 @@ import AppKit
 import SwiftUI
 
 /// Right-hand inspector form for the currently selected pane in the
-/// project editor. Fields vary based on leaf kind: terminal leaves show
-/// working directory / command / initial input / env vars, while browser
-/// leaves show an editable URL.
+/// project editor: working directory / command / initial input / env vars.
 struct ProjectEditorInspector: View {
     @ObservedObject var model: ProjectEditorModel
 
     var body: some View {
         if let path = model.selection,
-           let leaf = model.leaf(at: path),
+           model.leaf(at: path) != nil,
            let index = flatIndex(of: path) {
             Form {
                 Section(header: Text("Pane \(index + 1)")) {
-                    switch leaf.kind {
-                    case .terminal:
-                        terminalFields(path: path)
-                    case .browser:
-                        browserFields(path: path)
-                    }
+                    terminalFields(path: path)
                 }
             }
             .formStyle(.grouped)
@@ -81,21 +74,6 @@ struct ProjectEditorInspector: View {
             EnvironmentVariablesEditor(env: env)
                 .id(path)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    // MARK: - Browser fields
-
-    @ViewBuilder
-    private func browserFields(path: IndexPath) -> some View {
-        let url = stringBinding(
-            path: path,
-            get: { $0.url ?? "" },
-            set: { $0.url = $1.isEmpty ? nil : $1 }
-        )
-        LabeledContent("URL") {
-            TextField("https://example.com", text: url)
-                .textFieldStyle(.roundedBorder)
         }
     }
 

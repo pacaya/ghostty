@@ -274,7 +274,7 @@ private struct SidebarTabCard: View {
                 // Title (always shown — attention dot lives here)
                 if fields.contains(.title) {
                     HStack(spacing: 6) {
-                        Text(tab.cardTitle)
+                        Text(tab.displayTitle)
                             .font(.system(size: 12, weight: tab.isSelected ? .semibold : .regular))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -320,16 +320,6 @@ private struct SidebarTabCard: View {
                                 .font(.system(size: 9))
                                 .foregroundColor(theme.secondaryText)
                             Text(dir)
-                                .font(.system(size: 10))
-                                .foregroundColor(theme.secondaryText)
-                                .lineLimit(1)
-                        }
-                    } else if let web = tab.webTitle {
-                        HStack(spacing: 4) {
-                            Image(systemName: "globe")
-                                .font(.system(size: 9))
-                                .foregroundColor(theme.secondaryText)
-                            Text(web)
                                 .font(.system(size: 10))
                                 .foregroundColor(theme.secondaryText)
                                 .lineLimit(1)

@@ -1,33 +1,26 @@
 import Foundation
 
 /// A lightweight tree describing split geometry and working directories.
-/// Mirrors `SplitTree<PaneLeaf>.Node` but stores only the data needed to
+/// Mirrors `SplitTree<Ghostty.SurfaceView>.Node` but stores only the data needed to
 /// reconstruct a layout, not live NSView references.
 indirect enum ProjectLayoutNode: Codable, Equatable {
     case leaf(ProjectLeaf)
     case split(ProjectSplit)
 
-    enum ProjectLeafKind: String, Codable, Equatable {
-        case terminal
-        case browser
-    }
-
     struct ProjectLeaf: Codable, Equatable {
         /// Stable identifier for this leaf. Round-trips through persistence so
-        /// that a rebuilt `SurfaceView` / `BrowserPaneContainer` keeps the same
+        /// that a rebuilt `SurfaceView` keeps the same
         /// id it had before the snapshot, which lets callers correlate leaves
         /// across edits and relaunches.
         let id: UUID
 
-        /// Working directory for a terminal leaf. Ignored for browser leaves.
+        /// Working directory for the terminal.
         var workingDirectory: String
 
-        /// Leaf kind. Defaults to `.terminal` when absent in persisted JSON
-        /// so older project files continue to decode.
-        var kind: ProjectLeafKind
-
-        /// URL for a browser leaf. `nil` for terminal leaves.
-        var url: String?
+        /// True when decoded from a `"kind": "browser"` leaf written by builds
+        /// that had browser panes. Never encoded; such leaves are removed by
+        /// `droppingLegacyBrowserLeaves()` when projects are loaded.
+        let isLegacyBrowser: Bool
 
         /// Optional command to run after the shell loads. Sent as raw input
         /// to the PTY; a trailing newline is appended at launch time so the
@@ -40,15 +33,12 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
 
         init(
             workingDirectory: String,
-            kind: ProjectLeafKind = .terminal,
-            url: String? = nil,
             id: UUID = UUID(),
             initialInput: String? = nil,
             environmentVariables: [String: String] = [:]
         ) {
             self.workingDirectory = workingDirectory
-            self.kind = kind
-            self.url = url
+            self.isLegacyBrowser = false
             self.id = id
             self.initialInput = initialInput
             self.environmentVariables = environmentVariables
@@ -58,7 +48,6 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
             case id
             case workingDirectory
             case kind
-            case url
             case command
             case initialInput
             case environmentVariables
@@ -68,8 +57,7 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
             workingDirectory = try container.decodeIfPresent(String.self, forKey: .workingDirectory) ?? "~"
-            kind = try container.decodeIfPresent(ProjectLeafKind.self, forKey: .kind) ?? .terminal
-            url = try container.decodeIfPresent(String.self, forKey: .url)
+            isLegacyBrowser = try container.decodeIfPresent(String.self, forKey: .kind) == "browser"
             // Migrate older snapshots that persisted this text under "command".
             let legacyCommand = try container.decodeIfPresent(String.self, forKey: .command)
             initialInput = try container.decodeIfPresent(String.self, forKey: .initialInput) ?? legacyCommand
@@ -81,12 +69,8 @@ indirect enum ProjectLayoutNode: Codable, Equatable {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(id, forKey: .id)
             try container.encode(workingDirectory, forKey: .workingDirectory)
-            try container.encode(kind, forKey: .kind)
             // Normalize empty strings to omitted keys so JSON stays tidy and
             // matches libghostty's "unset → inherit" contract.
-            if let url, !url.isEmpty {
-                try container.encode(url, forKey: .url)
-            }
             if let initialInput, !initialInput.isEmpty {
                 try container.encode(initialInput, forKey: .initialInput)
             }
@@ -166,7 +150,7 @@ extension ProjectLayoutNode {
 
     /// Return a copy of the tree with every `ProjectLeaf.id` replaced with a
     /// fresh UUID. Required when cloning a layout (duplicate/import) because
-    /// leaf ids are reused as the live `SurfaceView` / `BrowserPaneContainer`
+    /// leaf ids are reused as the live `SurfaceView`
     /// UUID — sharing them across copies breaks app-global lookups like
     /// `AppDelegate.findSurface(forUUID:)` when both copies are open.
     func withRegeneratedLeafIDs() -> ProjectLayoutNode {
@@ -174,8 +158,6 @@ extension ProjectLayoutNode {
         case .leaf(let leaf):
             return .leaf(ProjectLeaf(
                 workingDirectory: leaf.workingDirectory,
-                kind: leaf.kind,
-                url: leaf.url,
                 id: UUID(),
                 initialInput: leaf.initialInput,
                 environmentVariables: leaf.environmentVariables
@@ -190,6 +172,31 @@ extension ProjectLayoutNode {
         }
     }
 
+    /// Return a copy without leaves that were browser panes, collapsing each
+    /// affected split into its remaining child. A layout made only of browser
+    /// leaves becomes a single terminal in the home directory.
+    func droppingLegacyBrowserLeaves() -> ProjectLayoutNode {
+        prunedOfLegacyBrowserLeaves() ?? .leaf(ProjectLeaf(workingDirectory: "~"))
+    }
+
+    private func prunedOfLegacyBrowserLeaves() -> ProjectLayoutNode? {
+        switch self {
+        case .leaf(let leaf):
+            return leaf.isLegacyBrowser ? nil : self
+        case .split(let split):
+            let left = split.left.prunedOfLegacyBrowserLeaves()
+            let right = split.right.prunedOfLegacyBrowserLeaves()
+            guard let left else { return right }
+            guard let right else { return left }
+            return .split(ProjectSplit(
+                direction: split.direction,
+                ratio: split.ratio,
+                left: left,
+                right: right
+            ))
+        }
+    }
+
     /// Return a copy with `initialInput` and `environmentVariables` cleared
     /// from every leaf. Used on import: those fields drive what the shell
     /// runs and the environment it runs in, so a shared project file would
@@ -200,8 +207,6 @@ extension ProjectLayoutNode {
         case .leaf(let leaf):
             return .leaf(ProjectLeaf(
                 workingDirectory: leaf.workingDirectory,
-                kind: leaf.kind,
-                url: leaf.url,
                 id: leaf.id
             ))
         case .split(let split):

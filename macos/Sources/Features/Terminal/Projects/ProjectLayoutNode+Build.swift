@@ -3,31 +3,18 @@ import GhosttyKit
 
 extension ProjectLayoutNode {
     /// Snapshot a live split tree into a lightweight layout blueprint.
-    static func from(tree: SplitTree<PaneLeaf>) -> ProjectLayoutNode? {
+    static func from(tree: SplitTree<Ghostty.SurfaceView>) -> ProjectLayoutNode? {
         guard let root = tree.root else { return nil }
         return from(node: root)
     }
 
-    private static func from(node: SplitTree<PaneLeaf>.Node) -> ProjectLayoutNode {
+    private static func from(node: SplitTree<Ghostty.SurfaceView>.Node) -> ProjectLayoutNode {
         switch node {
-        case .leaf(let paneLeaf):
-            if let terminal = paneLeaf.terminal {
-                return .leaf(ProjectLeaf(
-                    workingDirectory: terminal.pwd ?? "~",
-                    kind: .terminal,
-                    url: nil,
-                    id: paneLeaf.id
-                ))
-            } else if let browser = paneLeaf.browser {
-                return .leaf(ProjectLeaf(
-                    workingDirectory: "~",
-                    kind: .browser,
-                    url: browser.url?.absoluteString ?? BrowserCommands.defaultURL.absoluteString,
-                    id: paneLeaf.id
-                ))
-            } else {
-                return .leaf(ProjectLeaf(workingDirectory: "~", id: paneLeaf.id))
-            }
+        case .leaf(let view):
+            return .leaf(ProjectLeaf(
+                workingDirectory: view.pwd ?? "~",
+                id: view.id
+            ))
         case .split(let split):
             let direction: ProjectSplitDirection = split.direction == .horizontal ? .horizontal : .vertical
             return .split(ProjectSplit(
@@ -40,38 +27,30 @@ extension ProjectLayoutNode {
     }
 
     /// Reconstruct a live split tree from this blueprint.
-    /// Each leaf creates a new SurfaceView with its working directory set,
-    /// or a new BrowserPaneContainer for browser leaves.
-    func buildSplitTree(app: ghostty_app_t) -> SplitTree<PaneLeaf> {
+    /// Each leaf creates a new SurfaceView with its working directory set.
+    func buildSplitTree(app: ghostty_app_t) -> SplitTree<Ghostty.SurfaceView> {
         guard let root = buildNode(app: app) else {
             return SplitTree()
         }
         return SplitTree(root: root, zoomed: nil)
     }
 
-    private func buildNode(app: ghostty_app_t) -> SplitTree<PaneLeaf>.Node? {
+    private func buildNode(app: ghostty_app_t) -> SplitTree<Ghostty.SurfaceView>.Node? {
         switch self {
         case .leaf(let leaf):
-            switch leaf.kind {
-            case .terminal:
-                var config = Ghostty.SurfaceConfiguration()
-                config.workingDirectory = leaf.workingDirectory
-                config.initialInput = leaf.initialInput.map { $0.ensuringTrailingNewline() }
-                config.environmentVariables = leaf.environmentVariables
-                let view = Ghostty.SurfaceView(app, baseConfig: config, uuid: leaf.id)
-                return .leaf(view: PaneLeaf(terminal: view))
-            case .browser:
-                let url = leaf.url.flatMap(URL.init(string:)) ?? BrowserCommands.defaultURL
-                let container = BrowserPaneContainer(url: url, id: leaf.id)
-                return .leaf(view: PaneLeaf(browser: container))
-            }
+            var config = Ghostty.SurfaceConfiguration()
+            config.workingDirectory = leaf.workingDirectory
+            config.initialInput = leaf.initialInput.map { $0.ensuringTrailingNewline() }
+            config.environmentVariables = leaf.environmentVariables
+            let view = Ghostty.SurfaceView(app, baseConfig: config, uuid: leaf.id)
+            return .leaf(view: view)
 
         case .split(let split):
             guard let left = split.left.buildNode(app: app),
                   let right = split.right.buildNode(app: app) else {
                 return nil
             }
-            let direction: SplitTree<PaneLeaf>.Direction =
+            let direction: SplitTree<Ghostty.SurfaceView>.Direction =
                 split.direction == .horizontal ? .horizontal : .vertical
             return .split(.init(
                 direction: direction,
@@ -85,7 +64,7 @@ extension ProjectLayoutNode {
     /// Return a new layout whose leaves inherit editor-only fields
     /// (`initialInput`, `environmentVariables`) from leaves in `old` that share
     /// the same `ProjectLeaf.id`. Split structure and live-derived fields
-    /// (working directory, URL) are preserved from `self`.
+    /// (working directory) are preserved from `self`.
     func merging(editorFieldsFrom old: ProjectLayoutNode) -> ProjectLayoutNode {
         applyingEditorFields(old.editorFieldsByLeafID())
     }
@@ -119,8 +98,6 @@ extension ProjectLayoutNode {
             let fields = map[leaf.id]
             return .leaf(ProjectLeaf(
                 workingDirectory: leaf.workingDirectory,
-                kind: leaf.kind,
-                url: leaf.url,
                 id: leaf.id,
                 initialInput: fields?.initialInput,
                 environmentVariables: fields?.environmentVariables ?? [:]

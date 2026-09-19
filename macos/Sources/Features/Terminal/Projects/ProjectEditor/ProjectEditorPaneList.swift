@@ -28,17 +28,9 @@ struct ProjectEditorPaneList: View {
     }
 
     private func label(for leaf: ProjectLayoutNode.ProjectLeaf) -> String {
-        switch leaf.kind {
-        case .browser:
-            if let url = leaf.url, !url.isEmpty, let host = URL(string: url)?.host, !host.isEmpty {
-                return host
-            }
-            return "Browser"
-        case .terminal:
-            let wd = leaf.workingDirectory
-            guard !wd.isEmpty else { return "—" }
-            let basename = URL(fileURLWithPath: wd).lastPathComponent
-            return basename.isEmpty ? "—" : basename
-        }
+        let wd = leaf.workingDirectory
+        guard !wd.isEmpty else { return "—" }
+        let basename = URL(fileURLWithPath: wd).lastPathComponent
+        return basename.isEmpty ? "—" : basename
     }
 }

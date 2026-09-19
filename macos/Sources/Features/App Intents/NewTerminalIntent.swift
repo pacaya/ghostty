@@ -95,7 +95,7 @@ struct NewTerminalIntent: AppIntent {
 
             parent = view
         } else if let preferred = TerminalController.preferredParent {
-            parent = preferred.focusedSurface ?? preferred.surfaceTree.root?.leftmostLeaf().terminal
+            parent = preferred.focusedSurface ?? preferred.surfaceTree.root?.leftmostLeaf()
         } else {
             parent = nil
         }
@@ -111,7 +111,7 @@ struct NewTerminalIntent: AppIntent {
                 ghostty,
                 withBaseConfig: config,
                 withParent: parent?.window)
-            if let view = newController.surfaceTree.root?.leftmostLeaf().terminal {
+            if let view = newController.surfaceTree.root?.leftmostLeaf() {
                 return .result(value: await TerminalEntity(view: view))
             }
 
@@ -120,7 +120,7 @@ struct NewTerminalIntent: AppIntent {
                 ghostty,
                 from: parent?.window,
                 withBaseConfig: config)
-            if let view = newController?.surfaceTree.root?.leftmostLeaf().terminal {
+            if let view = newController?.surfaceTree.root?.leftmostLeaf() {
                 return .result(value: await TerminalEntity(view: view))
             }
 
@@ -153,7 +153,7 @@ enum NewTerminalLocation: String {
     case splitUp = "split:up"
     case splitDown = "split:down"
 
-    var splitDirection: SplitTree<PaneLeaf>.NewDirection? {
+    var splitDirection: SplitTree<Ghostty.SurfaceView>.NewDirection? {
         switch self {
         case .splitLeft: return .left
         case .splitRight: return .right

@@ -93,7 +93,7 @@ final class ScriptWindow: NSObject {
     var terminals: [ScriptTerminal] {
         guard NSApp.isAppleScriptEnabled else { return [] }
         return controllers
-            .flatMap { ($0.surfaceTree.root?.leaves() ?? []).compactMap { $0.terminal } }
+            .flatMap { $0.surfaceTree.root?.leaves() ?? [] }
             .map(ScriptTerminal.init)
     }
 
@@ -102,7 +102,7 @@ final class ScriptWindow: NSObject {
     func valueInTerminals(uniqueID: String) -> ScriptTerminal? {
         guard NSApp.isAppleScriptEnabled else { return nil }
         return controllers
-            .flatMap { ($0.surfaceTree.root?.leaves() ?? []).compactMap { $0.terminal } }
+            .flatMap { $0.surfaceTree.root?.leaves() ?? [] }
             .first(where: { $0.id.uuidString == uniqueID })
             .map(ScriptTerminal.init)
     }

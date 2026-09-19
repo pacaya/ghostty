@@ -73,7 +73,7 @@ final class TerminalRestorableState: TerminalRestorable {
     var focusedSurface: String? {
         internalState.focusedSurface
     }
-    var surfaceTree: SplitTree<PaneLeaf> {
+    var surfaceTree: SplitTree<Ghostty.SurfaceView> {
         internalState.surfaceTree
     }
     var effectiveFullscreenMode: FullscreenMode? {
@@ -91,7 +91,7 @@ final class TerminalRestorableState: TerminalRestorable {
     /// Since we can't really change the type of `TerminalRestorableState`
     /// due to `CodableBridge<TerminalRestorableState>` supporting secure coding,
     /// we use an internal type to perform migration and tests
-    private let internalState: InternalState<PaneLeaf>
+    private let internalState: InternalState<Ghostty.SurfaceView>
 
     /// The associated project ID, if this tab is linked to a saved project.
     /// Optional field added without version bump — old state decodes with nil.
@@ -126,7 +126,7 @@ final class TerminalRestorableState: TerminalRestorable {
 
     /// Custom decode to populate `SurfaceRestoreContext.leafConfigs` before
     /// `surfaceTree` is decoded inside `InternalState` — that's when
-    /// `PaneLeaf.init(from:)` fires for each leaf and the surface needs
+    /// `SurfaceView.init(from:)` fires for each leaf and the surface needs
     /// to read its per-leaf project config.
     required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -158,7 +158,7 @@ final class TerminalRestorableState: TerminalRestorable {
                 SurfaceRestoreContext.leafConfigs = [:]
             }
         }
-        self.internalState = try InternalState<PaneLeaf>(from: decoder)
+        self.internalState = try InternalState<Ghostty.SurfaceView>(from: decoder)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -246,12 +246,9 @@ class TerminalWindowRestoration: NSObject, NSWindowRestoration {
         // Find the focused surface in surfaceTree
         if let focusedStr = state.focusedSurface {
             var foundView: Ghostty.SurfaceView?
-            for leaf in c.surfaceTree {
-                guard let surface = leaf.terminal else { continue }
-                if surface.id.uuidString == focusedStr {
-                    foundView = surface
-                    break
-                }
+            for view in c.surfaceTree where view.id.uuidString == focusedStr {
+                foundView = view
+                break
             }
 
             if let view = foundView {

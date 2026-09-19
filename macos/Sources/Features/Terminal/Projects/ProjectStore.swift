@@ -47,7 +47,11 @@ final class ProjectStore: ObservableObject {
                 Self.logger.warning("Skipping projects file with unknown version \(file.version)")
                 return
             }
-            self.projects = file.projects
+            self.projects = file.projects.map { project in
+                var project = project
+                project.layoutRoot = project.layoutRoot.droppingLegacyBrowserLeaves()
+                return project
+            }
             self.folders = file.folders
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
             // No projects file yet — this is expected on first launch.
@@ -393,6 +397,7 @@ final class ProjectStore: ObservableObject {
             // command / initialInput / environmentVariables since a shared
             // project file would otherwise be a code-execution surface.
             let sanitizedLayout = project.layoutRoot
+                .droppingLegacyBrowserLeaves()
                 .strippingExecutableFields()
                 .withRegeneratedLeafIDs()
             let copy = Project(

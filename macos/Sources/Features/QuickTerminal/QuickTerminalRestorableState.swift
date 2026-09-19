@@ -7,7 +7,7 @@ struct QuickTerminalRestorableState: TerminalRestorable {
         internalState.focusedSurface
     }
 
-    var surfaceTree: SplitTree<PaneLeaf> {
+    var surfaceTree: SplitTree<Ghostty.SurfaceView> {
         internalState.surfaceTree
     }
 
@@ -15,7 +15,7 @@ struct QuickTerminalRestorableState: TerminalRestorable {
         internalState.screenStateEntries
     }
 
-    private let internalState: InternalState<PaneLeaf>
+    private let internalState: InternalState<Ghostty.SurfaceView>
 
     init(from controller: QuickTerminalController) {
         controller.saveScreenState(exitFullscreen: true)
@@ -47,7 +47,7 @@ extension QuickTerminalRestorableState {
     }
 }
 
-extension QuickTerminalRestorableState.InternalState where ViewType == PaneLeaf {
+extension QuickTerminalRestorableState.InternalState where ViewType == Ghostty.SurfaceView {
     init(from controller: QuickTerminalController) {
         self.init(
             focusedSurface: controller.focusedSurface?.id.uuidString,
