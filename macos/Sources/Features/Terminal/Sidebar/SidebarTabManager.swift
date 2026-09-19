@@ -4,6 +4,14 @@ import Combine
 /// Observes the tab group of a window and publishes tab metadata for the sidebar.
 @MainActor
 class SidebarTabManager: ObservableObject {
+    /// Removes the bell prefix `BaseTerminalController.computeTitle` adds while
+    /// the bell is active. Drops the prefix's own Character count because the
+    /// emoji is a single grapheme; a hardcoded count ate the first letter.
+    nonisolated static func strippingBell(_ title: String) -> String {
+        let bellPrefix = "\u{1F514} "
+        return title.hasPrefix(bellPrefix) ? String(title.dropFirst(bellPrefix.count)) : title
+    }
+
     struct TabItem: Identifiable, Equatable {
         let id: ObjectIdentifier
         let title: String
@@ -27,7 +35,7 @@ class SidebarTabManager: ObservableObject {
 
         /// Title with bell emoji stripped (the sidebar uses its own attention indicator).
         var displayTitle: String {
-            title.hasPrefix("\u{1F514} ") ? String(title.dropFirst(3)) : title
+            SidebarTabManager.strippingBell(title)
         }
 
         /// Card's primary title. Falls back to the browser page title on pure
@@ -269,7 +277,9 @@ class SidebarTabManager: ObservableObject {
         guard let controller = tab.window.windowController as? BaseTerminalController else { return }
         controller.titleOverride = newTitle.isEmpty ? nil : newTitle
         if let projectId = ProjectStore.shared.projectId(for: tab.window) {
-            ProjectStore.shared.renameProject(projectId, to: newTitle.isEmpty ? (tab.window.title) : newTitle)
+            ProjectStore.shared.renameProject(
+                projectId,
+                to: newTitle.isEmpty ? Self.strippingBell(tab.window.title) : newTitle)
         }
         refresh()
     }
