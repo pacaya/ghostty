@@ -115,6 +115,7 @@ douglance
 douglas
 douglas-macgregor
 drepper
+dungdm93
 dzhlobo
 ekaterinepapava
 elias8
@@ -249,6 +250,7 @@ neo773
 neoto
 neurosnap
 nicholas-ochoa
+nicolaair
 nicosuave
 nikicat
 nilsherzig
@@ -284,6 +286,7 @@ puzza007
 qappell
 quinnypig
 qwerasd205
+radicaltray
 ragnoroct
 raphamorim
 reo101
@@ -326,9 +329,11 @@ tdgroot
 tdslot
 thirstycrow
 -thomas-trijindev No human in the loop
+thomasfedb
 thoutbeckers
 ticclick
 tnagatomi
+toppk
 tothedarktowercame
 trag1c
 tristan957
@@ -359,4 +364,5 @@ zenangst
 zenyr
 zeshi09
 zlitus
+-zorzysty Meatproxying
 zubb
