@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import SwiftUI
 import UserNotifications
 import OSLog
@@ -622,6 +623,16 @@ class AppDelegate: NSObject,
             return nil
         }
 
+        // Plain text fields (sheets, sidebar, etc.) rely on Edit menu key
+        // equivalents for Cmd+C/V/X. Our default copy/paste bindings are
+        // performable, so they are never synced to the menu, and there is no
+        // Cut menu item. Route these directly to the focused text view.
+        if let action = Self.textEditingAction(for: event),
+           NSApp.keyWindow?.firstResponder is NSText,
+           NSApp.sendAction(action, to: nil, from: nil) {
+            return nil
+        }
+
         // If we have a main window then we don't process any of the keys
         // because we let it capture and propagate.
         guard NSApp.mainWindow == nil else { return event }
@@ -667,6 +678,30 @@ class AppDelegate: NSObject,
         }
 
         return event
+    }
+
+    /// The standard text editing action for a bare Cmd+C/V/X event, if any.
+    private static func textEditingAction(for event: NSEvent) -> Selector? {
+        let mods = event.modifierFlags.intersection([.shift, .control, .option, .command])
+        guard mods == .command else { return nil }
+
+        // Match the layout character first so Dvorak etc. work, falling back
+        // to the physical key for non-Latin layouts (e.g. Cyrillic).
+        let char = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        switch char {
+        case "c": return #selector(NSText.copy(_:))
+        case "v": return #selector(NSText.paste(_:))
+        case "x": return #selector(NSText.cut(_:))
+        default: break
+        }
+
+        guard !char.allSatisfy(\.isASCII) else { return nil }
+        switch Int(event.keyCode) {
+        case kVK_ANSI_C: return #selector(NSText.copy(_:))
+        case kVK_ANSI_V: return #selector(NSText.paste(_:))
+        case kVK_ANSI_X: return #selector(NSText.cut(_:))
+        default: return nil
+        }
     }
 
     @objc private func windowDidBecomeKey(_ notification: Notification) {
