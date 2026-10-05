@@ -47,26 +47,33 @@ struct ProjectEditorInspector: View {
         )
         let env = envBinding(path: path)
 
-        LabeledContent("Working Directory") {
+        // Label-on-top rows. Grouped forms treat a row's leading Text as its
+        // label and put text fields in a half-width, right-aligned value
+        // column (ignoring multilineTextAlignment). Giving each field its own
+        // label and hiding it opts the field out of that layout.
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Working Directory")
             HStack(spacing: 6) {
-                TextField("", text: wd)
+                TextField(text: wd) { Text("Working Directory") }
                     .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
                 Button("Choose…") { chooseWorkingDirectory(path: path) }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
 
         VStack(alignment: .leading, spacing: 4) {
-            LabeledContent("Command") {
-                HStack {
-                    TextField("", text: command, axis: .vertical)
-                        .lineLimit(1...)
-                        .textFieldStyle(.roundedBorder)
-                }
-            }
+            Text("Command")
+            TextField(text: command, axis: .vertical) { Text("Command") }
+                .lineLimit(1...)
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
             Text("Runs after the shell loads. A trailing newline is added if missing.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
 
         LabeledContent("Environment") {
             // Re-init per-path so the editor's internal row ordering doesn't
