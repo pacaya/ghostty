@@ -1449,7 +1449,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             return
         }
 
-        guard surfaceTree.contains(where: { $0.needsConfirmQuit }) else {
+        guard tabNeedsCloseConfirmation else {
             closeTabImmediately()
             return
         }
@@ -1480,7 +1480,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             }
 
             // Check if any surfaces require confirmation
-            return controller.surfaceTree.contains(where: { $0.needsConfirmQuit })
+            return controller.tabNeedsCloseConfirmation
         }) else {
             self.closeOtherTabsImmediately()
             return
@@ -1507,7 +1507,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
                 return false
             }
 
-            return controller.surfaceTree.contains(where: { $0.needsConfirmQuit })
+            return controller.tabNeedsCloseConfirmation
         }
 
         if !needsConfirm {
@@ -1566,7 +1566,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         let windows: [NSWindow] = window.tabGroup?.windows ?? [window]
         let confirmControllers = windows
             .compactMap({ $0.windowController as? TerminalController })
-            .filter({ $0.surfaceTree.contains(where: { $0.needsConfirmQuit }) })
+            .filter({ $0.tabNeedsCloseConfirmation })
         guard
             !confirmControllers.isEmpty
         else {
