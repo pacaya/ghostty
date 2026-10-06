@@ -18,8 +18,13 @@ final class ProjectEditorModel: ObservableObject {
 
     private var project: Project
 
-    init(project: Project) {
+    /// True while the project is open in a tab. The tab then owns the
+    /// layout and working directories; only editor-only fields can change.
+    let followsOpenTab: Bool
+
+    init(project: Project, followsOpenTab: Bool = false) {
         self.project = project
+        self.followsOpenTab = followsOpenTab
         self.editedLayout = project.layoutRoot
         self.selection = Self.firstLeafPath(in: project.layoutRoot)
     }
@@ -56,11 +61,17 @@ final class ProjectEditorModel: ObservableObject {
     }
 
     /// Normalizes editor fields, stamps `lastModified`, and writes the
-    /// updated project back to `store`.
+    /// updated project back to `store`. While the project follows an open
+    /// tab, the edits are applied onto the store's current layout so live
+    /// changes made while the sheet was open are kept.
     func save(to store: ProjectStore) {
         let normalized = Self.normalize(editedLayout)
-        var updated = project
-        updated.layoutRoot = normalized
+        var updated = store.projects.first(where: { $0.id == project.id }) ?? project
+        if followsOpenTab {
+            updated.layoutRoot = updated.layoutRoot.merging(editorFieldsFrom: normalized)
+        } else {
+            updated.layoutRoot = normalized
+        }
         updated.lastModified = Date()
         store.updateProject(updated)
         project = updated

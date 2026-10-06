@@ -59,6 +59,12 @@ struct ProjectEditorInspector: View {
                     .labelsHidden()
                 Button("Choose…") { chooseWorkingDirectory(path: path) }
             }
+            .disabled(model.followsOpenTab)
+            if model.followsOpenTab {
+                Text("Follows the open tab. Close the tab to edit.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
 

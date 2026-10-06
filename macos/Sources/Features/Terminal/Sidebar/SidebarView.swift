@@ -138,7 +138,7 @@ struct SidebarView: View {
 
                 if projectStore.projectId(for: tab.window) != nil {
                     Button("Close Tab") {
-                        closeTab(tab)
+                        tabManager.closeTab(tab)
                     }
                 } else {
                     Button("Save to Projects") {
@@ -150,9 +150,6 @@ struct SidebarView: View {
                 }
 
                 Button("Delete Tab") {
-                    if projectStore.projectId(for: tab.window) != nil {
-                        projectStore.disassociate(window: tab.window)
-                    }
                     tabManager.closeTab(tab)
                 }
 
@@ -169,19 +166,6 @@ struct SidebarView: View {
                     return idx >= tabManager.tabs.count - 1
                 }())
             }
-    }
-
-    private func closeTab(_ tab: SidebarTabManager.TabItem) {
-        if let projectId = projectStore.projectId(for: tab.window) {
-            if let controller = tab.window.windowController as? BaseTerminalController {
-                _ = projectStore.snapshotFromTab(
-                    controller: controller,
-                    existingProjectId: projectId
-                )
-            }
-            projectStore.disassociate(window: tab.window)
-        }
-        tabManager.closeTab(tab)
     }
 }
 
@@ -381,15 +365,6 @@ private struct SidebarTabCard: View {
     }
 
     private func closeTab() {
-        if let projectId = projectStore.projectId(for: tab.window) {
-            if let controller = tab.window.windowController as? BaseTerminalController {
-                _ = projectStore.snapshotFromTab(
-                    controller: controller,
-                    existingProjectId: projectId
-                )
-            }
-            projectStore.disassociate(window: tab.window)
-        }
         tabManager.closeTab(tab)
     }
 }

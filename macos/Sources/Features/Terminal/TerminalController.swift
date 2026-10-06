@@ -70,11 +70,15 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     /// The sidebar hosting view, kept for theme updates on config change.
     private var sidebarHostingView: NSHostingView<SidebarContainerView>?
 
+    /// Mirrors live tab changes into the linked project.
+    private(set) lazy var projectSync = ProjectTabSync(controller: self)
+
     /// The project this tab is associated with, if any. Persisted via restorable state.
     var projectId: UUID? {
         didSet {
             guard projectId != oldValue else { return }
             invalidateRestorableState()
+            projectSync.refresh()
         }
     }
 
@@ -186,12 +190,17 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     // MARK: Base Controller Overrides
 
+    override var titleOverride: String? {
+        didSet { projectSync.schedule() }
+    }
+
     override func surfaceTreeDidChange(from: SplitTree<Ghostty.SurfaceView>, to: SplitTree<Ghostty.SurfaceView>) {
         super.surfaceTreeDidChange(from: from, to: to)
 
         // Whenever our surface tree changes in any way (new split, close split, etc.)
         // we want to invalidate our state.
         invalidateRestorableState()
+        projectSync.refresh()
 
         // Update our zoom state
         if let window = window as? TerminalWindow {
@@ -1073,10 +1082,14 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         let tabIndex: Int?
         weak var tabGroup: NSWindowTabGroup?
         let tabColor: TerminalTabColor
+        var projectId: UUID?
     }
 
     convenience init(_ ghostty: Ghostty.App, with undoState: UndoState) {
         self.init(ghostty, withSurfaceTree: undoState.surfaceTree)
+        if let projectId = undoState.projectId, ProjectStore.shared.projects.contains(where: { $0.id == projectId }) {
+            self.projectId = projectId
+        }
 
         // Show the window and restore its frame
         showWindow(nil)
@@ -1128,7 +1141,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             focusedSurface: focusedSurface?.id,
             tabIndex: window.tabGroup?.windows.firstIndex(of: window),
             tabGroup: window.tabGroup,
-            tabColor: (window as? TerminalWindow)?.tabColor ?? .none)
+            tabColor: (window as? TerminalWindow)?.tabColor ?? .none,
+            projectId: projectId)
     }
 
     // MARK: - NSWindowController
@@ -1340,6 +1354,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     override func windowWillClose(_ notification: Notification) {
         super.windowWillClose(notification)
+        projectSync.flush()
+        if let window { ProjectStore.shared.disassociate(window: window) }
         cancelPendingInitialPresentation()
         self.relabelTabs()
 

@@ -11,7 +11,10 @@ struct ProjectEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     init(project: Project, projectStore: ProjectStore) {
-        _model = StateObject(wrappedValue: ProjectEditorModel(project: project))
+        _model = StateObject(wrappedValue: ProjectEditorModel(
+            project: project,
+            followsOpenTab: projectStore.isOpen(project.id)
+        ))
         self.projectStore = projectStore
         self.projectName = project.name
     }

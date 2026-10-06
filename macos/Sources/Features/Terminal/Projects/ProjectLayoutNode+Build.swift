@@ -3,16 +3,25 @@ import GhosttyKit
 
 extension ProjectLayoutNode {
     /// Snapshot a live split tree into a lightweight layout blueprint.
-    static func from(tree: SplitTree<Ghostty.SurfaceView>) -> ProjectLayoutNode? {
+    ///
+    /// A surface whose shell hasn't reported a working directory yet uses
+    /// `fallbackDirectories[surface.id]`, or `~` if there is none.
+    static func from(
+        tree: SplitTree<Ghostty.SurfaceView>,
+        fallbackDirectories: [UUID: String] = [:]
+    ) -> ProjectLayoutNode? {
         guard let root = tree.root else { return nil }
-        return from(node: root)
+        return from(node: root, fallbackDirectories: fallbackDirectories)
     }
 
-    private static func from(node: SplitTree<Ghostty.SurfaceView>.Node) -> ProjectLayoutNode {
+    private static func from(
+        node: SplitTree<Ghostty.SurfaceView>.Node,
+        fallbackDirectories: [UUID: String]
+    ) -> ProjectLayoutNode {
         switch node {
         case .leaf(let view):
             return .leaf(ProjectLeaf(
-                workingDirectory: view.pwd ?? "~",
+                workingDirectory: view.pwd ?? fallbackDirectories[view.id] ?? "~",
                 id: view.id
             ))
         case .split(let split):
@@ -20,8 +29,8 @@ extension ProjectLayoutNode {
             return .split(ProjectSplit(
                 direction: direction,
                 ratio: split.ratio,
-                left: from(node: split.left),
-                right: from(node: split.right)
+                left: from(node: split.left, fallbackDirectories: fallbackDirectories),
+                right: from(node: split.right, fallbackDirectories: fallbackDirectories)
             ))
         }
     }
@@ -67,6 +76,17 @@ extension ProjectLayoutNode {
     /// (working directory) are preserved from `self`.
     func merging(editorFieldsFrom old: ProjectLayoutNode) -> ProjectLayoutNode {
         applyingEditorFields(old.editorFieldsByLeafID())
+    }
+
+    /// Each leaf's working directory keyed by leaf id.
+    func workingDirectoriesByLeafID() -> [UUID: String] {
+        switch self {
+        case .leaf(let leaf):
+            return [leaf.id: leaf.workingDirectory]
+        case .split(let split):
+            return split.left.workingDirectoriesByLeafID()
+                .merging(split.right.workingDirectoriesByLeafID()) { first, _ in first }
+        }
     }
 
     /// Recursively collect each leaf's editor-only fields keyed by leaf id.

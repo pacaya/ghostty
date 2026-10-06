@@ -345,39 +345,49 @@ final class ProjectStore: ObservableObject {
         return project
     }
 
-    /// Snapshot the current state of a tab into a new or existing project.
-    func snapshotFromTab(
-        controller: BaseTerminalController,
-        existingProjectId: UUID? = nil
-    ) -> Project? {
+    /// Snapshot the current state of a tab into a new project.
+    func snapshotFromTab(controller: BaseTerminalController) -> Project? {
         guard let layoutRoot = ProjectLayoutNode.from(tree: controller.surfaceTree) else {
             return nil
         }
         let tabColor = (controller.window as? TerminalWindow)?.tabColor ?? .none
         let name = controller.titleOverride ?? controller.window?.title ?? "Untitled"
 
-        if let existingId = existingProjectId,
-           let idx = projects.firstIndex(where: { $0.id == existingId }) {
-            let merged = layoutRoot.merging(editorFieldsFrom: projects[idx].layoutRoot)
-            projects[idx].layoutRoot = merged
-            projects[idx].color = tabColor
-            projects[idx].name = name
-            projects[idx].lastModified = Date()
-            isDirty = true
-            return projects[idx]
-        } else {
-            let project = Project(
-                id: UUID(),
-                name: uniqueName(for: name, in: nil),
-                color: tabColor,
-                layoutRoot: layoutRoot,
-                lastModified: Date(),
-                folderId: nil,
-                sortOrder: nextSortOrder(in: nil)
-            )
-            addProject(project)
-            return project
+        let project = Project(
+            id: UUID(),
+            name: uniqueName(for: name, in: nil),
+            color: tabColor,
+            layoutRoot: layoutRoot,
+            lastModified: Date(),
+            folderId: nil,
+            sortOrder: nextSortOrder(in: nil)
+        )
+        addProject(project)
+        return project
+    }
+
+    /// Mirror a linked tab's live state into its project: panes, splits,
+    /// working directories, and tab color. The name follows only an explicit
+    /// tab title override. Editor-only leaf fields are kept.
+    func syncFromTab(controller: TerminalController) {
+        guard let projectId = controller.projectId,
+              let idx = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        let stored = projects[idx]
+        guard let live = ProjectLayoutNode.from(
+            tree: controller.surfaceTree,
+            fallbackDirectories: stored.layoutRoot.workingDirectoriesByLeafID()
+        ) else { return }
+
+        var updated = stored
+        updated.layoutRoot = live.merging(editorFieldsFrom: stored.layoutRoot)
+        updated.color = (controller.window as? TerminalWindow)?.tabColor ?? .none
+        if let name = controller.titleOverride {
+            updated.name = name
         }
+        guard updated != stored else { return }
+        updated.lastModified = Date()
+        projects[idx] = updated
+        isDirty = true
     }
 
     // MARK: - Import / Export
