@@ -2501,7 +2501,7 @@ keybind: Keybinds = .{},
 
 /// Require confirmation before pasting text that appears unsafe. This helps
 /// prevent a "copy/paste attack" where a user may accidentally execute unsafe
-/// commands by pasting text with newlines.
+/// commands by pasting text with newlines or carriage returns.
 @"clipboard-paste-protection": bool = true,
 
 /// If true, bracketed pastes will be considered safe. By default, bracketed
@@ -3825,6 +3825,13 @@ else
 /// with keybinds.
 @"gtk-tabs-location": GtkTabsLocation = .top,
 
+/// If true, the close button of each tab is shown at the start of the tab
+/// (the left, in left-to-right languages) and the tab's icon at the end.
+/// This applies to both the tab bar and the tab overview. GTK only.
+///
+/// Available since: 1.4.0
+@"gtk-tabs-inverted": bool = false,
+
 /// If this is `true`, the titlebar will be hidden when the window is maximized,
 /// and shown when the titlebar is unmaximized. GTK only.
 ///
@@ -4416,7 +4423,7 @@ pub fn loadCliArgs(self: *Config, alloc_gpa: Allocator) !void {
 
     // Any paths referenced from the CLI are relative to the current working
     // directory.
-    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     try self.expandPaths(buf[0..try std.Io.Dir.cwd().realPathFile(
         global.io(),
         ".",
@@ -4855,7 +4862,7 @@ pub fn finalize(self: *Config) !void {
                     if (wd == .home) {
                         var environ_map = try global.environMap();
                         defer environ_map.deinit();
-                        var buf: [std.fs.max_path_bytes]u8 = undefined;
+                        var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
                         if (try internal_os.home(global.io(), &environ_map, &buf)) |home| {
                             wd = .{ .path = try alloc.dupe(u8, home) };
                         } else {
@@ -5605,7 +5612,7 @@ pub const WorkingDirectory = union(enum) {
             else => return,
         };
 
-        var buf: [std.fs.max_path_bytes]u8 = undefined;
+        var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         const expanded = expandHome(path, &buf);
 
         if (std.mem.eql(u8, expanded, path)) return;
@@ -5666,7 +5673,7 @@ pub const WorkingDirectory = union(enum) {
             var wd: Self = .{ .path = "~/projects/ghostty" };
             try wd.finalize(alloc);
 
-            var buf: [std.fs.max_path_bytes]u8 = undefined;
+            var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
             const expected = internal_os.expandHome(
                 testing.io,
                 &environ_map,
@@ -10176,7 +10183,7 @@ pub const Theme = struct {
 
     /// Expand tilde paths in light/dark theme values.
     pub fn finalize(self: *Theme, alloc: Allocator) Allocator.Error!void {
-        var buf: [std.fs.max_path_bytes]u8 = undefined;
+        var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
 
         const light = expandHome(self.light, &buf);
         if (!std.mem.eql(u8, light, self.light))
@@ -10248,7 +10255,7 @@ pub const Theme = struct {
             var environ_map = try testing.environ.createMap(alloc);
             defer environ_map.deinit();
 
-            var home_buf: [std.fs.max_path_bytes]u8 = undefined;
+            var home_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
             const home = try internal_os.expandHome(
                 testing.io,
                 &environ_map,
@@ -10260,7 +10267,7 @@ pub const Theme = struct {
             try v.parseCLI(alloc, "light:~/foo, dark:~/bar");
             try v.finalize(alloc);
 
-            var expected_buf: [std.fs.max_path_bytes]u8 = undefined;
+            var expected_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
             try testing.expectEqualStrings(
                 try std.fmt.bufPrint(&expected_buf, "{s}foo", .{home}),
                 v.light,
@@ -10776,9 +10783,9 @@ test "clone can then change conditional state" {
         try writer.interface.writeAll(@embedFile("testdata/theme_dark"));
         try writer.end();
     }
-    var light_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var light_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const light = light_buf[0..try td.dir.realPathFile(testing.io, "theme_light", &light_buf)];
-    var dark_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var dark_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const dark = dark_buf[0..try td.dir.realPathFile(testing.io, "theme_dark", &dark_buf)];
 
     var cfg_light = try Config.default(alloc);
@@ -10853,7 +10860,7 @@ test "working-directory expands tilde" {
     try cfg.loadIter(alloc, &it);
     try cfg.finalize();
 
-    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const expected = internal_os.expandHome(
         io,
         &environ_map,
@@ -10933,7 +10940,7 @@ test "theme loading" {
         try writer.interface.writeAll(@embedFile("testdata/theme_simple"));
         try writer.end();
     }
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const path = path_buf[0..try td.dir.realPathFile(testing.io, "theme", &path_buf)];
 
     var cfg = try Config.default(alloc);
@@ -10972,7 +10979,7 @@ test "theme loading preserves conditional state" {
         try writer.interface.writeAll(@embedFile("testdata/theme_simple"));
         try writer.end();
     }
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const path = path_buf[0..try td.dir.realPathFile(testing.io, "theme", &path_buf)];
 
     var cfg = try Config.default(alloc);
@@ -11005,7 +11012,7 @@ test "theme priority is lower than config" {
         try writer.interface.writeAll(@embedFile("testdata/theme_simple"));
         try writer.end();
     }
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const path = path_buf[0..try td.dir.realPathFile(testing.io, "theme", &path_buf)];
 
     var cfg = try Config.default(alloc);
@@ -11049,9 +11056,9 @@ test "theme loading correct light/dark" {
         try writer.interface.writeAll(@embedFile("testdata/theme_dark"));
         try writer.end();
     }
-    var light_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var light_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const light = light_buf[0..try td.dir.realPathFile(testing.io, "theme_light", &light_buf)];
-    var dark_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var dark_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const dark = dark_buf[0..try td.dir.realPathFile(testing.io, "theme_dark", &dark_buf)];
 
     // Light
