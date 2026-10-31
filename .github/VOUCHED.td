@@ -44,6 +44,7 @@ alex19ep
 alexbathome
 alexfeijoo44
 alexjuca
+aljohri
 alosarjos
 amadeus
 and-rs
@@ -52,8 +53,10 @@ anhthang
 anmitalidev
 anthonyzhoon
 aprilnea
+aredmondd
 arneshbanerjee
 arvin7liu
+aryanhamedani
 athaapa
 atomk
 aurelleb
@@ -68,6 +71,7 @@ bennettp123
 benodiwal
 bernsno
 beryesa
+binaryfire
 bitigchi
 bkircher
 bleikurr
@@ -84,7 +88,9 @@ charliie-dev
 chernetskyi
 chronologos
 clemg
+clinta
 cmwetherell
+complexsplit
 crayxt
 craziestowl
 -creativision meatproxying
@@ -99,6 +105,8 @@ danneu
 danulqua
 dariogriffo
 dave92082
+davey-hughes
+davidhodge
 -davidpmclaughlin Refusing to follow AI policy and exhibit good faith behavior
 davidsanchez222
 deblasis
@@ -110,6 +118,7 @@ diego-moment
 diegoarmstrong
 dkinzler
 dmehala
+dmkenney
 dmunozv04
 dobbylee
 dolzenko
@@ -120,6 +129,7 @@ douglas-macgregor
 drepper
 dungdm93
 dzhlobo
+edsarmiento
 ekaterinepapava
 ekusiadadus
 elias8
@@ -149,6 +159,7 @@ gagbo
 ghokun
 gmile
 gordonbondon
+-gotar No HITL
 gotenksin
 gpanders
 guilhermetk
@@ -157,6 +168,7 @@ h3nock
 hackattack
 hakonhagland
 halosatrio
+hamidp
 heaths
 heddxh heddxh
 heitoraugustoln
@@ -170,6 +182,7 @@ hulet
 i999rri
 ibaios
 icodesign
+-ifmael
 illiakrauchanka
 j-c-m
 j0hnm4r5
@@ -181,6 +194,7 @@ jamylak
 jarred-sumner
 jcollie
 jesusvazquez
+jglanz
 jguthmiller
 jmcgover
 jmr
@@ -207,6 +221,7 @@ kloneets
 knu
 -kody-w
 konstantinhudyakov
+-kooshapari No HITL
 koranir
 korikhin
 kostich
@@ -215,9 +230,11 @@ kristofersoler
 kylesower
 laxystem
 lebdron
+lehni
 lepips
 liby
 linustalacko
+locriani
 lonsagisawa
 lotheac
 louisunlimited
@@ -264,6 +281,7 @@ myleshen
 nagato-yuzuru
 natesmyth
 neo773
+neobrain
 neoto
 neurosnap
 nicholas-ochoa
@@ -279,6 +297,7 @@ nwehg
 ocean6954
 ollieatkinson
 ollioddi
+olrtg
 oshdubh
 otomn
 paaloeye
@@ -302,6 +321,7 @@ pressatojump
 prihlop
 priyans-hu
 pssalman
+pugma
 puzza007
 pyre909
 qappell
@@ -324,8 +344,10 @@ rmengelbrecht
 rmunn
 robmorgan
 rockorager
+romen
 ronijacobson
 rpfaeffle
+rtgibbons
 ruoyouz
 ruseel
 sahilkmishra
@@ -354,12 +376,14 @@ tasselx
 tbrundige
 tdgroot
 tdslot
+thapakrish
 thirstycrow
 -thomas-trijindev No human in the loop
 thomasfedb
 thoutbeckers
 ticclick
 tnagatomi
+tonypapousek
 toppk
 tothedarktowercame
 trag1c
@@ -387,6 +411,7 @@ yabbal
 yak3d
 yamshta
 ydah
+yeager
 -zaviro
 zenangst
 zenyr
@@ -394,3 +419,4 @@ zeshi09
 zlitus
 -zorzysty Meatproxying
 zubb
+zzznu
